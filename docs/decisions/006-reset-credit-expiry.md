@@ -18,8 +18,8 @@ The existing usage response exposes only reset-credit counts. It does not includ
 
 - Request reset-credit details only when the usage response reports a positive available count.
 - Use the existing ephemeral authenticated session and require the detail URL to use HTTPS with the same host and port as the usage URL.
-- Decode only availability, plan support, and expiry metadata needed for display.
-- Show the earliest expiry among available credits supported by the current plan in the user's local time zone.
+- Decode only availability, plan support, grant, and expiry metadata needed for display.
+- Show the earliest expiry among available credits supported by the current plan in the user's local time zone, and visualize remaining lifetime as `(expires_at - now) / (expires_at - granted_at)` when both timestamps are valid.
 - Treat the detail request as best-effort with a five-second request timeout. A failure preserves weekly quota and reset-credit count without inventing an expiry.
 
 ## Rejected alternatives
@@ -31,4 +31,4 @@ The existing usage response exposes only reset-credit counts. It does not includ
 
 ## Consequences
 
-Each refresh with a positive reset-credit count makes one additional read-only request to the existing ChatGPT host. The detail path is not a public API, so the app must continue to degrade safely if its response or availability changes.
+Each refresh with a positive reset-credit count makes one additional read-only request to the existing ChatGPT host. The detail path is not a public API, so the app must continue to degrade safely if its response or availability changes. Missing or invalid grant metadata leaves the expiry text visible but hides its progress bar rather than assuming a lifetime.

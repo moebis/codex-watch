@@ -36,17 +36,20 @@ struct UsageWindow: Equatable, Identifiable, Sendable {
 struct UsageSnapshot: Equatable, Sendable {
     let windows: [UsageWindow]
     let availableResetCredits: Int?
+    let nextResetCreditGrantedAt: Date?
     let nextResetCreditExpiry: Date?
     let fetchedAt: Date
 
     init(
         windows: [UsageWindow],
         availableResetCredits: Int? = nil,
+        nextResetCreditGrantedAt: Date? = nil,
         nextResetCreditExpiry: Date? = nil,
         fetchedAt: Date = .now
     ) {
         self.windows = windows
         self.availableResetCredits = availableResetCredits
+        self.nextResetCreditGrantedAt = nextResetCreditGrantedAt
         self.nextResetCreditExpiry = nextResetCreditExpiry
         self.fetchedAt = fetchedAt
     }
@@ -59,16 +62,19 @@ struct UsageSnapshot: Equatable, Sendable {
     }
 
     func adding(resetCreditDetails details: ResetCreditDetails) -> UsageSnapshot {
-        UsageSnapshot(
+        let hasAvailableCredits = (availableResetCredits ?? 0) > 0
+        return UsageSnapshot(
             windows: windows,
             availableResetCredits: availableResetCredits,
-            nextResetCreditExpiry: availableResetCredits.map { $0 > 0 ? details.nextExpiry : nil } ?? nil,
+            nextResetCreditGrantedAt: hasAvailableCredits ? details.nextGrantedAt : nil,
+            nextResetCreditExpiry: hasAvailableCredits ? details.nextExpiry : nil,
             fetchedAt: fetchedAt
         )
     }
 }
 
 struct ResetCreditDetails: Equatable, Sendable {
+    let nextGrantedAt: Date?
     let nextExpiry: Date?
 }
 

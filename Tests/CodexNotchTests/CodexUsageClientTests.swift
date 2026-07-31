@@ -69,6 +69,10 @@ final class CodexUsageClientTests: XCTestCase {
 
         XCTAssertEqual(snapshot.availableResetCredits, 2)
         XCTAssertEqual(
+            snapshot.nextResetCreditGrantedAt,
+            ISO8601DateFormatter().date(from: "2029-12-03T08:30:45Z")
+        )
+        XCTAssertEqual(
             snapshot.nextResetCreditExpiry,
             ISO8601DateFormatter().date(from: "2030-01-02T08:30:45Z")
         )
@@ -86,6 +90,7 @@ final class CodexUsageClientTests: XCTestCase {
         let snapshot = try await makeClient().fetch()
 
         XCTAssertEqual(snapshot.availableResetCredits, 2)
+        XCTAssertNil(snapshot.nextResetCreditGrantedAt)
         XCTAssertNil(snapshot.nextResetCreditExpiry)
         XCTAssertEqual(snapshot.windows.count, 1)
     }
@@ -112,6 +117,7 @@ final class CodexUsageClientTests: XCTestCase {
         let snapshot = try await makeClient().fetch()
 
         XCTAssertEqual(snapshot.availableResetCredits, 0)
+        XCTAssertNil(snapshot.nextResetCreditGrantedAt)
         XCTAssertNil(snapshot.nextResetCreditExpiry)
     }
 

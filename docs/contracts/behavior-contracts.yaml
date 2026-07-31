@@ -88,10 +88,10 @@ contracts:
     last_verified_commit: 23b1418
 
   - id: MENU-PROGRESS-005
-    title: The status menu visualizes both remaining quota and reset time
+    title: The status menu visualizes quota and exact time windows
     status: active
-    statement: The top of the status menu contains two labeled native progress bars. The quota bar is the clamped remaining weekly percentage. The reset bar is the clamped time remaining until reset divided by the exact window duration returned by the usage endpoint. Text labels preserve the numeric meaning, and missing reset metadata is shown as unavailable instead of using an assumed duration.
-    rationale: Paired remaining-state bars make quota capacity and renewal timing scannable while keeping the calculation truthful and accessible.
+    statement: The top of the status menu contains two always-present labeled native progress bars for weekly quota and weekly reset, plus a reset-credit expiry bar when exact grant and expiry metadata is available. The quota bar is the clamped remaining weekly percentage. Each time bar is the clamped time remaining divided by its exact server-provided duration. Text labels preserve the numeric meaning, and missing metadata never produces an assumed progress value.
+    rationale: Remaining-state bars make quota capacity and renewal or expiry timing scannable while keeping each calculation truthful and accessible.
     source: user-confirmed
     owner: project-maintainer
     risk: medium
@@ -99,12 +99,12 @@ contracts:
       include: [status-menu, usage-parsing, accessibility]
       exclude: [quota-prediction, hardcoded-reset-window, additional-network-data]
     examples:
-      positive: With 81 percent quota remaining and two days left in a seven-day window, the bars show 81 percent and two sevenths remaining.
-      negative: The reset bar assumes every window is seven days when the endpoint omits its duration.
+      positive: With 81 percent quota remaining, two days left in a seven-day weekly window, and 20 days left in a 30-day reset-credit lifetime, the bars show 81 percent, two sevenths, and two thirds remaining.
+      negative: A time bar assumes a weekly or reset-credit duration when the endpoint omits the required metadata.
     guards:
       - Tests/CodexNotchTests/MenuBarTextTests.swift
       - Tests/CodexNotchTests/CodexUsageClientTests.swift
-      - "manual: inspect both progress bars and labels in the open menu on a real Mac"
+      - "manual: inspect all available progress bars and labels in the open menu on a real Mac"
     supersedes: []
     superseded_by: null
     last_verified_commit: pending
@@ -133,7 +133,7 @@ contracts:
   - id: RESET-CREDITS-006
     title: Available rate-limit reset credits are shown without fabrication
     status: active
-    statement: When the usage response includes a nonnegative rate_limit_reset_credits.available_count value, the status menu displays that count in a separate labeled row. The app also makes a best-effort read-only request to the same ChatGPT HTTPS host for reset-credit details and shows the earliest expiry among available credits supported by the current plan. Zero is displayed as an available count, while a missing or invalid count hides the row. Missing detail metadata or a detail-request failure preserves the count without fabricating an expiry. The app does not infer a total credit capacity or merge this count with the weekly automatic reset time.
+    statement: When the usage response includes a nonnegative rate_limit_reset_credits.available_count value, the status menu displays that count in a separate labeled row. The app also makes a best-effort read-only request to the same ChatGPT HTTPS host for reset-credit details and shows the earliest expiry among available credits supported by the current plan. When that same credit has exact granted_at and expires_at values, a native progress bar shows its clamped remaining lifetime. Zero is displayed as an available count, while a missing or invalid count hides the row. Missing detail metadata or a detail-request failure preserves the count without fabricating an expiry or duration. The app does not infer a total credit capacity or merge this count with the weekly automatic reset time.
     rationale: Reset credits are useful actionable quota information, including when the next one will expire, but their meaning must remain distinct from the weekly window and absent values must not be misrepresented.
     source: user-confirmed
     owner: project-maintainer
@@ -142,8 +142,8 @@ contracts:
       include: [usage-parsing, status-menu, reset-credits]
       exclude: [credit-redemption, inferred-credit-capacity, non-ChatGPT-network-requests]
     examples:
-      positive: Two available credits display as 2 available with the earliest supported available expiry in local time, and a failed detail request still displays the count.
-      negative: A missing expiry is inferred from the weekly reset or an expired or unsupported credit supplies the displayed expiry.
+      positive: Two available credits display as 2 available with the earliest supported available expiry in local time and its exact remaining-lifetime progress, while a failed detail request still displays the count.
+      negative: A missing grant time is treated as a fixed 30-day duration, or an expired or unsupported credit supplies the displayed expiry.
     guards:
       - Tests/CodexNotchTests/CodexUsageClientTests.swift
       - Tests/CodexNotchTests/MenuBarTextTests.swift

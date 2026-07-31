@@ -279,10 +279,12 @@ struct QuotaProgressPresentation: Equatable {
     let resetProgress: Double?
     let resetCreditsValue: String?
     let resetCreditsDetail: String?
+    let resetCreditsProgress: Double?
 
     init(snapshot: UsageSnapshot?, error: MenuBarErrorState?, now: Date) {
         resetCreditsValue = snapshot?.availableResetCredits.map { "\($0) available" }
         resetCreditsDetail = MenuBarText.resetCreditExpiryLine(snapshot: snapshot)
+        resetCreditsProgress = Self.resetCreditProgress(snapshot: snapshot, now: now)
         guard let weekly = snapshot?.weeklyWindow else {
             switch error {
             case .signInRequired:
@@ -323,6 +325,17 @@ struct QuotaProgressPresentation: Equatable {
         return min(1, max(0, value))
     }
 
+    private static func resetCreditProgress(snapshot: UsageSnapshot?, now: Date) -> Double? {
+        guard let count = snapshot?.availableResetCredits,
+              count > 0,
+              let grantedAt = snapshot?.nextResetCreditGrantedAt,
+              let expiresAt = snapshot?.nextResetCreditExpiry else { return nil }
+        let duration = expiresAt.timeIntervalSince(grantedAt)
+        guard duration.isFinite, duration > 0 else { return nil }
+        let remaining = max(0, expiresAt.timeIntervalSince(now))
+        return clamp(remaining / duration)
+    }
+
     private static func durationText(_ interval: TimeInterval) -> String {
         let totalMinutes = max(0, Int(interval / 60))
         let days = totalMinutes / (24 * 60)
@@ -340,10 +353,13 @@ final class QuotaProgressMenuView: NSView {
     static let height: CGFloat = 116
     static let heightWithResetCredits: CGFloat = 124
     static let heightWithResetCreditExpiry: CGFloat = 146
+    static let heightWithResetCreditProgress: CGFloat = 158
 
     init(presentation: QuotaProgressPresentation) {
         let viewHeight: CGFloat
-        if presentation.resetCreditsDetail != nil {
+        if presentation.resetCreditsProgress != nil {
+            viewHeight = Self.heightWithResetCreditProgress
+        } else if presentation.resetCreditsDetail != nil {
             viewHeight = Self.heightWithResetCreditExpiry
         } else if presentation.resetCreditsValue != nil {
             viewHeight = Self.heightWithResetCredits
@@ -388,6 +404,14 @@ final class QuotaProgressMenuView: NSView {
             let creditsRow = Self.labelRow(title: "Reset credits", value: creditsValue)
             stack.addArrangedSubview(creditsRow)
             creditsRow.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        }
+        if let creditsProgress = presentation.resetCreditsProgress {
+            let progress = Self.progressBar(
+                value: creditsProgress,
+                accessibilityLabel: "Time remaining until next reset credit expires"
+            )
+            stack.addArrangedSubview(progress)
+            progress.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
         if let creditsDetail = presentation.resetCreditsDetail {
             let detailLabel = NSTextField(labelWithString: creditsDetail)
