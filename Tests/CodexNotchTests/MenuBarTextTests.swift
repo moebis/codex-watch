@@ -183,6 +183,50 @@ final class MenuBarTextTests: XCTestCase {
         )
     }
 
+    func testResetCreditProgressUsesExactGrantToExpiryDuration() throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let snapshot = UsageSnapshot(
+            windows: [],
+            availableResetCredits: 1,
+            nextResetCreditGrantedAt: now.addingTimeInterval(-10 * 24 * 60 * 60),
+            nextResetCreditExpiry: now.addingTimeInterval(20 * 24 * 60 * 60)
+        )
+
+        let presentation = QuotaProgressPresentation(snapshot: snapshot, error: nil, now: now)
+
+        XCTAssertEqual(try XCTUnwrap(presentation.resetCreditsProgress), 2.0 / 3.0, accuracy: 0.0001)
+        XCTAssertEqual(
+            QuotaProgressPresentation(
+                snapshot: snapshot,
+                error: nil,
+                now: now.addingTimeInterval(21 * 24 * 60 * 60)
+            ).resetCreditsProgress,
+            0
+        )
+    }
+
+    func testResetCreditProgressDoesNotAssumeMissingOrInvalidDuration() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let missingGrant = UsageSnapshot(
+            windows: [],
+            availableResetCredits: 1,
+            nextResetCreditExpiry: now.addingTimeInterval(60)
+        )
+        let invalidDuration = UsageSnapshot(
+            windows: [],
+            availableResetCredits: 1,
+            nextResetCreditGrantedAt: now.addingTimeInterval(120),
+            nextResetCreditExpiry: now.addingTimeInterval(60)
+        )
+
+        XCTAssertNil(
+            QuotaProgressPresentation(snapshot: missingGrant, error: nil, now: now).resetCreditsProgress
+        )
+        XCTAssertNil(
+            QuotaProgressPresentation(snapshot: invalidDuration, error: nil, now: now).resetCreditsProgress
+        )
+    }
+
     func testProgressMenuShowsResetCreditsRowOnlyWhenAvailable() {
         let visiblePresentation = QuotaProgressPresentation(
             snapshot: UsageSnapshot(windows: [], availableResetCredits: 2),
@@ -209,6 +253,7 @@ final class MenuBarTextTests: XCTestCase {
             snapshot: UsageSnapshot(
                 windows: [],
                 availableResetCredits: 1,
+                nextResetCreditGrantedAt: Date(timeIntervalSince1970: 1_890_969_045),
                 nextResetCreditExpiry: Date(timeIntervalSince1970: 1_893_561_045)
             ),
             error: nil,
@@ -216,9 +261,15 @@ final class MenuBarTextTests: XCTestCase {
         )
 
         let view = QuotaProgressMenuView(presentation: presentation)
+        let progressBars = progressIndicators(in: view)
 
         XCTAssertTrue(textValues(in: view).contains { $0.hasPrefix("Expires: ") })
-        XCTAssertEqual(view.frame.height, QuotaProgressMenuView.heightWithResetCreditExpiry)
+        XCTAssertEqual(progressBars.count, 3)
+        XCTAssertEqual(
+            progressBars.last?.toolTip,
+            "Time remaining until next reset credit expires"
+        )
+        XCTAssertEqual(view.frame.height, QuotaProgressMenuView.heightWithResetCreditProgress)
     }
 
     private func progressIndicators(in view: NSView) -> [NSProgressIndicator] {

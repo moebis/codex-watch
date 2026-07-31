@@ -63,21 +63,28 @@ struct ResetCreditDetailsDTO: Decodable {
     let credits: [ResetCreditDTO]?
 
     func details() -> ResetCreditDetails {
-        let nextExpiry = (credits ?? [])
+        let nextCredit = (credits ?? [])
             .filter { $0.status == "available" && $0.isSupportedByPlan != false }
-            .compactMap(\.expiresAt)
-            .min()
-        return ResetCreditDetails(nextExpiry: nextExpiry)
+            .filter { $0.expiresAt != nil }
+            .min { lhs, rhs in
+                lhs.expiresAt ?? .distantFuture < rhs.expiresAt ?? .distantFuture
+            }
+        return ResetCreditDetails(
+            nextGrantedAt: nextCredit?.grantedAt,
+            nextExpiry: nextCredit?.expiresAt
+        )
     }
 }
 
 struct ResetCreditDTO: Decodable {
     let status: String?
+    let grantedAt: Date?
     let expiresAt: Date?
     let isSupportedByPlan: Bool?
 
     enum CodingKeys: String, CodingKey {
         case status
+        case grantedAt = "granted_at"
         case expiresAt = "expires_at"
         case isSupportedByPlan = "is_supported_by_plan"
     }
@@ -86,6 +93,7 @@ struct ResetCreditDTO: Decodable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         status = try container.decodeIfPresent(String.self, forKey: .status)
         isSupportedByPlan = try container.decodeIfPresent(Bool.self, forKey: .isSupportedByPlan)
+        grantedAt = container.decodeISO8601DateIfPresent(forKey: .grantedAt)
         expiresAt = container.decodeISO8601DateIfPresent(forKey: .expiresAt)
     }
 }
