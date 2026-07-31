@@ -254,6 +254,14 @@ enum MenuBarText {
         return "Resets: \(resetFormatter.string(from: resetAt))"
     }
 
+    static func resetCreditExpiryLine(snapshot: UsageSnapshot?) -> String? {
+        guard let count = snapshot?.availableResetCredits,
+              count > 0,
+              let expiresAt = snapshot?.nextResetCreditExpiry else { return nil }
+        let prefix = count == 1 ? "Expires" : "Next expires"
+        return "\(prefix): \(resetFormatter.string(from: expiresAt))"
+    }
+
     private static let resetFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -270,9 +278,11 @@ struct QuotaProgressPresentation: Equatable {
     let resetDetail: String?
     let resetProgress: Double?
     let resetCreditsValue: String?
+    let resetCreditsDetail: String?
 
     init(snapshot: UsageSnapshot?, error: MenuBarErrorState?, now: Date) {
         resetCreditsValue = snapshot?.availableResetCredits.map { "\($0) available" }
+        resetCreditsDetail = MenuBarText.resetCreditExpiryLine(snapshot: snapshot)
         guard let weekly = snapshot?.weeklyWindow else {
             switch error {
             case .signInRequired:
@@ -329,9 +339,17 @@ final class QuotaProgressMenuView: NSView {
     static let width: CGFloat = 260
     static let height: CGFloat = 116
     static let heightWithResetCredits: CGFloat = 124
+    static let heightWithResetCreditExpiry: CGFloat = 146
 
     init(presentation: QuotaProgressPresentation) {
-        let viewHeight = presentation.resetCreditsValue == nil ? Self.height : Self.heightWithResetCredits
+        let viewHeight: CGFloat
+        if presentation.resetCreditsDetail != nil {
+            viewHeight = Self.heightWithResetCreditExpiry
+        } else if presentation.resetCreditsValue != nil {
+            viewHeight = Self.heightWithResetCredits
+        } else {
+            viewHeight = Self.height
+        }
         super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: viewHeight))
         translatesAutoresizingMaskIntoConstraints = false
 
@@ -370,6 +388,15 @@ final class QuotaProgressMenuView: NSView {
             let creditsRow = Self.labelRow(title: "Reset credits", value: creditsValue)
             stack.addArrangedSubview(creditsRow)
             creditsRow.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        }
+        if let creditsDetail = presentation.resetCreditsDetail {
+            let detailLabel = NSTextField(labelWithString: creditsDetail)
+            detailLabel.font = .systemFont(ofSize: 11)
+            detailLabel.textColor = .secondaryLabelColor
+            detailLabel.lineBreakMode = .byTruncatingTail
+            detailLabel.translatesAutoresizingMaskIntoConstraints = false
+            stack.addArrangedSubview(detailLabel)
+            detailLabel.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
 
         NSLayoutConstraint.activate([

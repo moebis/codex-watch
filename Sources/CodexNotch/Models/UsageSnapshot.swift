@@ -36,15 +36,18 @@ struct UsageWindow: Equatable, Identifiable, Sendable {
 struct UsageSnapshot: Equatable, Sendable {
     let windows: [UsageWindow]
     let availableResetCredits: Int?
+    let nextResetCreditExpiry: Date?
     let fetchedAt: Date
 
     init(
         windows: [UsageWindow],
         availableResetCredits: Int? = nil,
+        nextResetCreditExpiry: Date? = nil,
         fetchedAt: Date = .now
     ) {
         self.windows = windows
         self.availableResetCredits = availableResetCredits
+        self.nextResetCreditExpiry = nextResetCreditExpiry
         self.fetchedAt = fetchedAt
     }
 
@@ -55,6 +58,18 @@ struct UsageSnapshot: Equatable, Sendable {
         }
     }
 
+    func adding(resetCreditDetails details: ResetCreditDetails) -> UsageSnapshot {
+        UsageSnapshot(
+            windows: windows,
+            availableResetCredits: availableResetCredits,
+            nextResetCreditExpiry: availableResetCredits.map { $0 > 0 ? details.nextExpiry : nil } ?? nil,
+            fetchedAt: fetchedAt
+        )
+    }
+}
+
+struct ResetCreditDetails: Equatable, Sendable {
+    let nextExpiry: Date?
 }
 
 enum WeeklyQuotaLevel: Equatable, Sendable {

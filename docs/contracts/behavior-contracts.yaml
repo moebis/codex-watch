@@ -133,17 +133,17 @@ contracts:
   - id: RESET-CREDITS-006
     title: Available rate-limit reset credits are shown without fabrication
     status: active
-    statement: When the existing usage response includes a nonnegative rate_limit_reset_credits.available_count value, the status menu displays that count in a separate labeled row. Zero is displayed as an available count, while a missing or invalid value hides the row. The app does not infer a total credit capacity or merge this count with the weekly automatic reset time.
-    rationale: Reset credits are useful actionable quota information, but their meaning must remain distinct from the weekly window and absent values must not be misrepresented.
+    statement: When the usage response includes a nonnegative rate_limit_reset_credits.available_count value, the status menu displays that count in a separate labeled row. The app also makes a best-effort read-only request to the same ChatGPT HTTPS host for reset-credit details and shows the earliest expiry among available credits supported by the current plan. Zero is displayed as an available count, while a missing or invalid count hides the row. Missing detail metadata or a detail-request failure preserves the count without fabricating an expiry. The app does not infer a total credit capacity or merge this count with the weekly automatic reset time.
+    rationale: Reset credits are useful actionable quota information, including when the next one will expire, but their meaning must remain distinct from the weekly window and absent values must not be misrepresented.
     source: user-confirmed
     owner: project-maintainer
-    risk: medium
+    risk: high
     scope:
       include: [usage-parsing, status-menu, reset-credits]
-      exclude: [credit-redemption, inferred-credit-capacity, additional-network-requests]
+      exclude: [credit-redemption, inferred-credit-capacity, non-ChatGPT-network-requests]
     examples:
-      positive: An available_count of 2 is displayed as 2 available, and zero is displayed as 0 available.
-      negative: A missing available_count is displayed as zero or as a progress percentage.
+      positive: Two available credits display as 2 available with the earliest supported available expiry in local time, and a failed detail request still displays the count.
+      negative: A missing expiry is inferred from the weekly reset or an expired or unsupported credit supplies the displayed expiry.
     guards:
       - Tests/CodexNotchTests/CodexUsageClientTests.swift
       - Tests/CodexNotchTests/MenuBarTextTests.swift

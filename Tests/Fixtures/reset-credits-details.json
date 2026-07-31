@@ -1,0 +1,26 @@
+{
+  "credits": [
+    {
+      "status": "available",
+      "expires_at": "2030-01-03T08:30:45.123456Z",
+      "is_supported_by_plan": true
+    },
+    {
+      "status": "available",
+      "expires_at": "2030-01-02T08:30:45Z",
+      "is_supported_by_plan": true
+    },
+    {
+      "status": "redeemed",
+      "expires_at": "2030-01-01T08:30:45Z",
+      "is_supported_by_plan": true
+    },
+    {
+      "status": "available",
+      "expires_at": "2029-12-31T08:30:45Z",
+      "is_supported_by_plan": false
+    }
+  ],
+  "available_count": 2,
+  "total_earned_count": 4
+}
