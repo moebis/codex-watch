@@ -53,6 +53,68 @@ final class CodexUsageClientTests: XCTestCase {
         XCTAssertEqual(snapshot.windows.first?.remainingPercent, 80)
     }
 
+    func testResetCreditDetailsAddNextSupportedAvailableExpiry() async throws {
+        let usageData = try Data(contentsOf: fixtureURL("usage-weekly-only.json"))
+        let detailsData = try Data(contentsOf: fixtureURL("reset-credits-details.json"))
+        MockURLProtocol.requestHandler = { request in
+            if request.url?.path == CodexUsageClient.resetCreditsPath {
+                XCTAssertNil(request.value(forHTTPHeaderField: "OpenAI-Beta"))
+                XCTAssertNil(request.value(forHTTPHeaderField: "originator"))
+                return (self.response(status: 200, url: request.url), detailsData)
+            }
+            return (self.response(status: 200, url: request.url), usageData)
+        }
+
+        let snapshot = try await makeClient().fetch()
+
+        XCTAssertEqual(snapshot.availableResetCredits, 2)
+        XCTAssertEqual(
+            snapshot.nextResetCreditExpiry,
+            ISO8601DateFormatter().date(from: "2030-01-02T08:30:45Z")
+        )
+    }
+
+    func testResetCreditDetailFailurePreservesUsageAndCount() async throws {
+        let usageData = try Data(contentsOf: fixtureURL("usage-weekly-only.json"))
+        MockURLProtocol.requestHandler = { request in
+            if request.url?.path == CodexUsageClient.resetCreditsPath {
+                return (self.response(status: 503, url: request.url), Data())
+            }
+            return (self.response(status: 200, url: request.url), usageData)
+        }
+
+        let snapshot = try await makeClient().fetch()
+
+        XCTAssertEqual(snapshot.availableResetCredits, 2)
+        XCTAssertNil(snapshot.nextResetCreditExpiry)
+        XCTAssertEqual(snapshot.windows.count, 1)
+    }
+
+    func testZeroResetCreditsDoesNotRequestDetails() async throws {
+        let responseData = Data(
+            """
+            {
+              "secondary_window": {
+                "used_percent": 5,
+                "limit_window_seconds": 604800
+              },
+              "rate_limit_reset_credits": {
+                "available_count": 0
+              }
+            }
+            """.utf8
+        )
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.url?.path, "/backend-api/wham/usage")
+            return (self.response(status: 200, url: request.url), responseData)
+        }
+
+        let snapshot = try await makeClient().fetch()
+
+        XCTAssertEqual(snapshot.availableResetCredits, 0)
+        XCTAssertNil(snapshot.nextResetCreditExpiry)
+    }
+
     func testRequestDisablesCaching() async throws {
         let responseData = try Data(contentsOf: fixtureURL("usage-weekly-only.json"))
         MockURLProtocol.requestHandler = { request in
@@ -98,6 +160,27 @@ final class CodexUsageClientTests: XCTestCase {
         }
     }
 
+    func testResetCreditEndpointOnAnotherHostIsRejectedWithoutBreakingUsage() async throws {
+        let usageData = try Data(contentsOf: fixtureURL("usage-weekly-only.json"))
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.url?.host, "example.test")
+            return (self.response(status: 200, url: request.url), usageData)
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let client = CodexUsageClient(
+            credentials: CodexCredentials(accessToken: "fixture-access-token", accountID: nil),
+            session: URLSession(configuration: configuration),
+            endpoint: URL(string: "https://example.test/backend-api/wham/usage")!,
+            resetCreditsEndpoint: URL(string: "https://other.example/reset-credits")!
+        )
+
+        let snapshot = try await client.fetch()
+
+        XCTAssertEqual(snapshot.availableResetCredits, 2)
+        XCTAssertNil(snapshot.nextResetCreditExpiry)
+    }
+
     private func makeClient() -> CodexUsageClient {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockURLProtocol.self]
@@ -111,9 +194,9 @@ final class CodexUsageClientTests: XCTestCase {
         )
     }
 
-    private func response(status: Int) -> HTTPURLResponse {
+    private func response(status: Int, url: URL? = nil) -> HTTPURLResponse {
         HTTPURLResponse(
-            url: URL(string: "https://example.test/backend-api/wham/usage")!,
+            url: url ?? URL(string: "https://example.test/backend-api/wham/usage")!,
             statusCode: status,
             httpVersion: nil,
             headerFields: ["Content-Type": "application/json"]

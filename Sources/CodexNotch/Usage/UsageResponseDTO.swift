@@ -59,6 +59,37 @@ struct ResetCreditsDTO: Decodable {
     }
 }
 
+struct ResetCreditDetailsDTO: Decodable {
+    let credits: [ResetCreditDTO]?
+
+    func details() -> ResetCreditDetails {
+        let nextExpiry = (credits ?? [])
+            .filter { $0.status == "available" && $0.isSupportedByPlan != false }
+            .compactMap(\.expiresAt)
+            .min()
+        return ResetCreditDetails(nextExpiry: nextExpiry)
+    }
+}
+
+struct ResetCreditDTO: Decodable {
+    let status: String?
+    let expiresAt: Date?
+    let isSupportedByPlan: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case expiresAt = "expires_at"
+        case isSupportedByPlan = "is_supported_by_plan"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        status = try container.decodeIfPresent(String.self, forKey: .status)
+        isSupportedByPlan = try container.decodeIfPresent(Bool.self, forKey: .isSupportedByPlan)
+        expiresAt = container.decodeISO8601DateIfPresent(forKey: .expiresAt)
+    }
+}
+
 struct RateLimitDTO: Decodable {
     let primaryWindow: WindowDTO?
     let secondaryWindow: WindowDTO?
@@ -89,9 +120,26 @@ struct WindowDTO: Decodable {
             let seconds = epoch > 1_000_000_000_000 ? epoch / 1_000 : epoch
             resetAt = Date(timeIntervalSince1970: seconds)
         } else if let text = try? container.decode(String.self, forKey: .resetAt) {
-            resetAt = ISO8601DateFormatter().date(from: text)
+            resetAt = Self.parseISO8601Date(text)
         } else {
             resetAt = nil
         }
+    }
+
+    private static func parseISO8601Date(_ text: String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: text) ?? ISO8601DateFormatter().date(from: text)
+    }
+}
+
+private extension KeyedDecodingContainer {
+    func decodeISO8601DateIfPresent(forKey key: Key) -> Date? {
+        guard let text = try? decodeIfPresent(String.self, forKey: key) else {
+            return nil
+        }
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: text) ?? ISO8601DateFormatter().date(from: text)
     }
 }

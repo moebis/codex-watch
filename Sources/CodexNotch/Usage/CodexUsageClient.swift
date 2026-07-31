@@ -43,36 +43,66 @@ private final class SameHostHTTPSRedirectDelegate: NSObject, URLSessionTaskDeleg
 
 struct CodexUsageClient {
     static let defaultEndpoint = URL(string: "https://chatgpt.com/backend-api/wham/usage")!
+    static let resetCreditsPath = "/backend-api/wham/rate-limit-reset-credits"
 
     let credentials: CodexCredentials
     let session: URLSession
     let endpoint: URL
+    let resetCreditsEndpoint: URL
 
     init(credentials: CodexCredentials,
          session: URLSession = SecureUsageSession.make(),
-         endpoint: URL = CodexUsageClient.defaultEndpoint) {
+         endpoint: URL = CodexUsageClient.defaultEndpoint,
+         resetCreditsEndpoint: URL? = nil) {
         self.credentials = credentials
         self.session = session
         self.endpoint = endpoint
+        self.resetCreditsEndpoint = resetCreditsEndpoint
+            ?? endpoint.deletingLastPathComponent().appendingPathComponent("rate-limit-reset-credits")
     }
 
     func fetch() async throws -> UsageSnapshot {
         let data = try await fetchData(from: endpoint)
+        let snapshot: UsageSnapshot
         do {
-            return try JSONDecoder().decode(UsageResponseDTO.self, from: data).snapshot()
+            snapshot = try JSONDecoder().decode(UsageResponseDTO.self, from: data).snapshot()
+        } catch {
+            throw CodexUsageError.decodingFailed
+        }
+
+        // Expiry metadata is currently available only from a separate read-only
+        // endpoint. Treat it as optional so quota and count display survive an
+        // endpoint change, entitlement difference, or transient failure.
+        guard let count = snapshot.availableResetCredits,
+              count > 0,
+              let details = try? await fetchResetCreditDetails() else {
+            return snapshot
+        }
+        return snapshot.adding(resetCreditDetails: details)
+    }
+
+    private func fetchResetCreditDetails() async throws -> ResetCreditDetails {
+        let data = try await fetchData(from: resetCreditsEndpoint, timeoutInterval: 5)
+        do {
+            return try JSONDecoder().decode(ResetCreditDetailsDTO.self, from: data).details()
         } catch {
             throw CodexUsageError.decodingFailed
         }
     }
 
-    private func fetchData(from endpoint: URL) async throws -> Data {
-        guard endpoint.scheme == "https" else {
+    private func fetchData(
+        from endpoint: URL,
+        timeoutInterval: TimeInterval = 15
+    ) async throws -> Data {
+        guard endpoint.scheme == "https",
+              endpoint.host == self.endpoint.host,
+              endpoint.port == self.endpoint.port else {
             throw CodexUsageError.invalidHTTPResponse
         }
         var request = URLRequest(
             url: endpoint,
             cachePolicy: .reloadIgnoringLocalCacheData,
-            timeoutInterval: 15
+            timeoutInterval: timeoutInterval
         )
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -80,7 +110,6 @@ struct CodexUsageClient {
         if let accountID = credentials.accountID, !accountID.isEmpty {
             request.setValue(accountID, forHTTPHeaderField: "ChatGPT-Account-Id")
         }
-
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw CodexUsageError.invalidHTTPResponse
