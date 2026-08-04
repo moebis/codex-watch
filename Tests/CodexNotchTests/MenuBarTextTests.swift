@@ -110,8 +110,12 @@ final class MenuBarTextTests: XCTestCase {
     func testProgressMenuViewContainsTwoNativeProgressIndicators() {
         let presentation = QuotaProgressPresentation(snapshot: nil, error: nil, now: .now)
         let view = QuotaProgressMenuView(presentation: presentation)
+        let progressBars = progressIndicators(in: view)
 
-        XCTAssertEqual(progressIndicators(in: view).count, 2)
+        XCTAssertEqual(progressBars.count, 2)
+        XCTAssertTrue(progressBars.allSatisfy { $0 is NeutralProgressIndicator })
+        XCTAssertEqual(NeutralProgressIndicator.fillColor, .secondaryLabelColor)
+        XCTAssertEqual(NeutralProgressIndicator.trackColor, .separatorColor)
         XCTAssertEqual(view.frame.size.width, QuotaProgressMenuView.width)
         XCTAssertEqual(view.frame.size.height, QuotaProgressMenuView.height)
     }

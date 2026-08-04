@@ -348,6 +348,29 @@ struct QuotaProgressPresentation: Equatable {
     }
 }
 
+final class NeutralProgressIndicator: NSProgressIndicator {
+    static let fillColor = NSColor.secondaryLabelColor
+    static let trackColor = NSColor.separatorColor
+
+    override func draw(_ dirtyRect: NSRect) {
+        let trackBounds = bounds.integral
+        let radius = trackBounds.height / 2
+
+        Self.trackColor.setFill()
+        NSBezierPath(roundedRect: trackBounds, xRadius: radius, yRadius: radius).fill()
+
+        let range = maxValue - minValue
+        guard range > 0 else { return }
+        let fraction = min(1, max(0, (doubleValue - minValue) / range))
+        guard fraction > 0 else { return }
+
+        var fillBounds = trackBounds
+        fillBounds.size.width *= fraction
+        Self.fillColor.setFill()
+        NSBezierPath(roundedRect: fillBounds, xRadius: radius, yRadius: radius).fill()
+    }
+}
+
 final class QuotaProgressMenuView: NSView {
     static let width: CGFloat = 260
     static let height: CGFloat = 116
@@ -457,7 +480,7 @@ final class QuotaProgressMenuView: NSView {
     }
 
     private static func progressBar(value: Double?, accessibilityLabel: String) -> NSProgressIndicator {
-        let progress = NSProgressIndicator()
+        let progress = NeutralProgressIndicator()
         progress.style = .bar
         progress.controlSize = .small
         progress.isIndeterminate = false
