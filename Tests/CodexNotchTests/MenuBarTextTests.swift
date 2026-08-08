@@ -54,6 +54,7 @@ final class MenuBarTextTests: XCTestCase {
     func testProgressPresentationUsesRemainingQuotaAndExactWindowDuration() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let snapshot = UsageSnapshot(
+            plan: .pro,
             windows: [
                 UsageWindow(
                     id: "weekly",
@@ -67,11 +68,28 @@ final class MenuBarTextTests: XCTestCase {
 
         let presentation = QuotaProgressPresentation(snapshot: snapshot, error: nil, now: now)
 
+        XCTAssertEqual(presentation.planValue, "Pro")
         XCTAssertEqual(presentation.quotaValue, "81%")
         XCTAssertEqual(try XCTUnwrap(presentation.quotaProgress), 0.81, accuracy: 0.0001)
         XCTAssertEqual(presentation.resetValue, "2d 0h")
         XCTAssertEqual(try XCTUnwrap(presentation.resetProgress), 2.0 / 7.0, accuracy: 0.0001)
         XCTAssertNotNil(presentation.resetDetail)
+    }
+
+    func testPlanDisplayUsesNormalizedNameAndNeverExposesUnknownValues() {
+        let known = QuotaProgressPresentation(
+            snapshot: UsageSnapshot(plan: .business, windows: []),
+            error: nil,
+            now: .now
+        )
+        let missing = QuotaProgressPresentation(
+            snapshot: UsageSnapshot(windows: []),
+            error: nil,
+            now: .now
+        )
+
+        XCTAssertEqual(known.planValue, "Business")
+        XCTAssertEqual(missing.planValue, "Unavailable")
     }
 
     func testResetProgressIsClampedAndUnavailableDataIsNotFabricated() {
@@ -118,6 +136,8 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertEqual(NeutralProgressIndicator.trackColor, .separatorColor)
         XCTAssertEqual(view.frame.size.width, QuotaProgressMenuView.width)
         XCTAssertEqual(view.frame.size.height, QuotaProgressMenuView.height)
+        XCTAssertTrue(textValues(in: view).contains("Plan"))
+        XCTAssertTrue(textValues(in: view).contains("Unavailable"))
     }
 
     func testResetCreditsShowAvailableCountIncludingZeroAndHideWhenMissing() {

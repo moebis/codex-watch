@@ -1,5 +1,40 @@
 import Foundation
 
+enum ChatGPTPlan: Equatable, Sendable {
+    case free
+    case go
+    case plus
+    case pro
+    case business
+    case enterprise
+    case edu
+
+    init?(apiValue: String) {
+        switch apiValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "free": self = .free
+        case "go": self = .go
+        case "plus": self = .plus
+        case "pro": self = .pro
+        case "business": self = .business
+        case "enterprise": self = .enterprise
+        case "edu": self = .edu
+        default: return nil
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .free: "Free"
+        case .go: "Go"
+        case .plus: "Plus"
+        case .pro: "Pro"
+        case .business: "Business"
+        case .enterprise: "Enterprise"
+        case .edu: "Edu"
+        }
+    }
+}
+
 enum UsageWindowKind: Equatable, Sendable {
     case rolling(hours: Int)
     case daily
@@ -34,6 +69,7 @@ struct UsageWindow: Equatable, Identifiable, Sendable {
 }
 
 struct UsageSnapshot: Equatable, Sendable {
+    let plan: ChatGPTPlan?
     let windows: [UsageWindow]
     let availableResetCredits: Int?
     let nextResetCreditGrantedAt: Date?
@@ -41,12 +77,14 @@ struct UsageSnapshot: Equatable, Sendable {
     let fetchedAt: Date
 
     init(
+        plan: ChatGPTPlan? = nil,
         windows: [UsageWindow],
         availableResetCredits: Int? = nil,
         nextResetCreditGrantedAt: Date? = nil,
         nextResetCreditExpiry: Date? = nil,
         fetchedAt: Date = .now
     ) {
+        self.plan = plan
         self.windows = windows
         self.availableResetCredits = availableResetCredits
         self.nextResetCreditGrantedAt = nextResetCreditGrantedAt
@@ -64,6 +102,7 @@ struct UsageSnapshot: Equatable, Sendable {
     func adding(resetCreditDetails details: ResetCreditDetails) -> UsageSnapshot {
         let hasAvailableCredits = (availableResetCredits ?? 0) > 0
         return UsageSnapshot(
+            plan: plan,
             windows: windows,
             availableResetCredits: availableResetCredits,
             nextResetCreditGrantedAt: hasAvailableCredits ? details.nextGrantedAt : nil,

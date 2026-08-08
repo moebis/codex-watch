@@ -1,12 +1,14 @@
 import Foundation
 
 struct UsageResponseDTO: Decodable {
+    let planType: String?
     let primaryWindow: WindowDTO?
     let secondaryWindow: WindowDTO?
     let rateLimit: RateLimitDTO?
     let rateLimitResetCredits: ResetCreditsDTO?
 
     enum CodingKeys: String, CodingKey {
+        case planType = "plan_type"
         case primaryWindow = "primary_window"
         case secondaryWindow = "secondary_window"
         case rateLimit = "rate_limit"
@@ -23,6 +25,7 @@ struct UsageResponseDTO: Decodable {
         ].compactMap { $0 }
 
         return UsageSnapshot(
+            plan: planType.flatMap(ChatGPTPlan.init(apiValue:)),
             windows: windows,
             availableResetCredits: availableResetCredits,
             fetchedAt: fetchedAt

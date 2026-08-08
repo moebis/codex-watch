@@ -20,6 +20,7 @@ final class CodexUsageClientTests: XCTestCase {
         let snapshot = try await makeClient().fetch()
 
         XCTAssertEqual(snapshot.windows.count, 1)
+        XCTAssertEqual(snapshot.plan, .plus)
         XCTAssertEqual(snapshot.windows.first?.kind, .weekly)
         XCTAssertEqual(snapshot.windows.first?.usedPercent, 5)
         XCTAssertEqual(snapshot.windows.first?.durationSeconds, 604_800)
@@ -35,6 +36,7 @@ final class CodexUsageClientTests: XCTestCase {
         let snapshot = try await makeClient().fetch()
 
         XCTAssertEqual(snapshot.windows.map(\.kind), [.rolling(hours: 5), .weekly])
+        XCTAssertEqual(snapshot.plan, .plus)
         XCTAssertEqual(snapshot.windows.map(\.id), ["primary", "secondary"])
         XCTAssertEqual(snapshot.availableResetCredits, 1)
     }
@@ -48,9 +50,24 @@ final class CodexUsageClientTests: XCTestCase {
         let snapshot = try await makeClient().fetch()
 
         XCTAssertEqual(snapshot.windows.count, 1)
+        XCTAssertEqual(snapshot.plan, .plus)
         XCTAssertEqual(snapshot.windows.first?.kind, .weekly)
         XCTAssertEqual(snapshot.windows.first?.usedPercent, 20)
         XCTAssertEqual(snapshot.windows.first?.remainingPercent, 80)
+    }
+
+    func testUnknownOrMissingPlanIsNotExposed() throws {
+        let unknown = try JSONDecoder().decode(
+            UsageResponseDTO.self,
+            from: Data(#"{"plan_type":"unreleased-tier"}"#.utf8)
+        ).snapshot()
+        let missing = try JSONDecoder().decode(
+            UsageResponseDTO.self,
+            from: Data("{}".utf8)
+        ).snapshot()
+
+        XCTAssertNil(unknown.plan)
+        XCTAssertNil(missing.plan)
     }
 
     func testResetCreditDetailsAddNextSupportedAvailableExpiry() async throws {

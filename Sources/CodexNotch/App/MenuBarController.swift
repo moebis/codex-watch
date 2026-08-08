@@ -272,6 +272,7 @@ enum MenuBarText {
 }
 
 struct QuotaProgressPresentation: Equatable {
+    let planValue: String
     let quotaValue: String
     let quotaProgress: Double?
     let resetValue: String
@@ -282,6 +283,7 @@ struct QuotaProgressPresentation: Equatable {
     let resetCreditsProgress: Double?
 
     init(snapshot: UsageSnapshot?, error: MenuBarErrorState?, now: Date) {
+        planValue = snapshot?.plan?.displayName ?? "Unavailable"
         resetCreditsValue = snapshot?.availableResetCredits.map { "\($0) available" }
         resetCreditsDetail = MenuBarText.resetCreditExpiryLine(snapshot: snapshot)
         resetCreditsProgress = Self.resetCreditProgress(snapshot: snapshot, now: now)
@@ -373,10 +375,10 @@ final class NeutralProgressIndicator: NSProgressIndicator {
 
 final class QuotaProgressMenuView: NSView {
     static let width: CGFloat = 260
-    static let height: CGFloat = 116
-    static let heightWithResetCredits: CGFloat = 124
-    static let heightWithResetCreditExpiry: CGFloat = 146
-    static let heightWithResetCreditProgress: CGFloat = 158
+    static let height: CGFloat = 138
+    static let heightWithResetCredits: CGFloat = 146
+    static let heightWithResetCreditExpiry: CGFloat = 168
+    static let heightWithResetCreditProgress: CGFloat = 180
 
     init(presentation: QuotaProgressPresentation) {
         let viewHeight: CGFloat
@@ -392,6 +394,7 @@ final class QuotaProgressMenuView: NSView {
         super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: viewHeight))
         translatesAutoresizingMaskIntoConstraints = false
 
+        let planRow = Self.labelRow(title: "Plan", value: presentation.planValue)
         let quotaRow = Self.labelRow(title: "Weekly remaining", value: presentation.quotaValue)
         let quotaBar = Self.progressBar(
             value: presentation.quotaProgress,
@@ -403,14 +406,14 @@ final class QuotaProgressMenuView: NSView {
             accessibilityLabel: "Time remaining until weekly reset"
         )
 
-        let stack = NSStackView(views: [quotaRow, quotaBar, resetRow, resetBar])
+        let stack = NSStackView(views: [planRow, quotaRow, quotaBar, resetRow, resetBar])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 6
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
 
-        for view in [quotaRow, quotaBar, resetRow, resetBar] {
+        for view in [planRow, quotaRow, quotaBar, resetRow, resetBar] {
             view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
 

@@ -151,3 +151,25 @@ contracts:
     supersedes: []
     superseded_by: null
     last_verified_commit: pending
+
+  - id: PLAN-DISPLAY-008
+    title: The status menu shows only a server-reported recognized ChatGPT plan
+    status: active
+    statement: The expanded status menu contains an always-present Plan row. A recognized plan_type from the existing usage response is shown as a normalized ChatGPT plan name. Missing or unrecognized values display Unavailable; the app never guesses a plan, Pro sub-tier, token allowance, or absolute quota from percentages.
+    rationale: The server-reported plan gives useful account context, while fail-closed normalization prevents an internal or changed field from becoming a misleading entitlement claim.
+    source: user-confirmed
+    owner: project-maintainer
+    risk: medium
+    scope:
+      include: [usage-parsing, status-menu]
+      exclude: [hover-popover, token-estimation, plan-sub-tier-inference, additional-network-data]
+    examples:
+      positive: A plan_type of pro displays Plan and Pro above the weekly quota row.
+      negative: An unknown plan is displayed verbatim, or 68 percent remaining is converted into a fabricated token count.
+    guards:
+      - Tests/CodexNotchTests/CodexUsageClientTests.swift
+      - Tests/CodexNotchTests/MenuBarTextTests.swift
+      - "manual: inspect the Plan row in the open menu on a real Mac"
+    supersedes: []
+    superseded_by: null
+    last_verified_commit: pending
