@@ -6,6 +6,7 @@ struct UsageResponseDTO: Decodable {
     let secondaryWindow: WindowDTO?
     let rateLimit: RateLimitDTO?
     let rateLimitResetCredits: ResetCreditsDTO?
+    let credits: CreditsDTO?
 
     enum CodingKeys: String, CodingKey {
         case planType = "plan_type"
@@ -13,6 +14,7 @@ struct UsageResponseDTO: Decodable {
         case secondaryWindow = "secondary_window"
         case rateLimit = "rate_limit"
         case rateLimitResetCredits = "rate_limit_reset_credits"
+        case credits
     }
 
     func snapshot(fetchedAt: Date = .now) -> UsageSnapshot {
@@ -26,6 +28,7 @@ struct UsageResponseDTO: Decodable {
 
         return UsageSnapshot(
             plan: planType.flatMap(ChatGPTPlan.init(apiValue:)),
+            creditsRemaining: credits?.validatedRemaining,
             windows: windows,
             availableResetCredits: availableResetCredits,
             fetchedAt: fetchedAt
@@ -51,6 +54,42 @@ struct UsageResponseDTO: Decodable {
             resetAt: dto.resetAt,
             durationSeconds: TimeInterval(seconds)
         )
+    }
+}
+
+struct CreditsDTO: Decodable {
+    let hasCredits: Bool?
+    let unlimited: Bool?
+    let balance: String?
+
+    enum CodingKeys: String, CodingKey {
+        case hasCredits = "has_credits"
+        case unlimited
+        case balance
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        hasCredits = try? container.decodeIfPresent(Bool.self, forKey: .hasCredits)
+        unlimited = try? container.decodeIfPresent(Bool.self, forKey: .unlimited)
+        if let text = try? container.decodeIfPresent(String.self, forKey: .balance) {
+            balance = text
+        } else if let number = try? container.decodeIfPresent(Decimal.self, forKey: .balance) {
+            balance = NSDecimalNumber(decimal: number).stringValue
+        } else {
+            balance = nil
+        }
+    }
+
+    var validatedRemaining: CreditsRemaining? {
+        if unlimited == true { return .unlimited }
+        guard hasCredits == true, let balance else { return nil }
+        let trimmed = balance.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              trimmed.count <= 64,
+              let value = Decimal(string: trimmed, locale: Locale(identifier: "en_US_POSIX")),
+              !value.isNaN else { return nil }
+        return .balance(trimmed)
     }
 }
 

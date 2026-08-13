@@ -173,3 +173,25 @@ contracts:
     supersedes: []
     superseded_by: null
     last_verified_commit: pending
+
+  - id: CREDITS-BALANCE-009
+    title: The status menu shows the server-reported ChatGPT credits remaining
+    status: active
+    statement: When credits.has_credits is true and the existing usage response contains a numeric credits.balance value, the expanded status menu displays it in one Credits remaining row. Positive, zero, and negative server-reported balances are preserved. When credits.unlimited is true, the row displays Unlimited instead of a numeric balance. A missing entitlement, missing or malformed balance, or oversized value hides the row and is never replaced with an assumed zero. No message estimates or other credits metadata are displayed.
+    rationale: The server can report a negative balance after concurrent usage depletes credits, while has_credits and unlimited determine whether a numeric balance has the intended meaning.
+    source: user-confirmed-and-official-docs
+    owner: project-maintainer
+    risk: medium
+    scope:
+      include: [usage-parsing, status-menu, credits-balance]
+      exclude: [message-estimates, overage-state, spend-controls, additional-rate-limits]
+    examples:
+      positive: A credits.balance of -1.25 with has_credits true displays Credits remaining and -1.25, while unlimited true displays Unlimited.
+      negative: A missing entitlement displays zero, or approximate message counts are added to the menu.
+    guards:
+      - Tests/CodexNotchTests/CodexUsageClientTests.swift
+      - Tests/CodexNotchTests/MenuBarTextTests.swift
+      - "manual: compare the Credits remaining row with the ChatGPT Usage Dashboard on a real Mac"
+    supersedes: []
+    superseded_by: null
+    last_verified_commit: pending

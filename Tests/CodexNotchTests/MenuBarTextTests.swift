@@ -55,6 +55,7 @@ final class MenuBarTextTests: XCTestCase {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let snapshot = UsageSnapshot(
             plan: .pro,
+            creditsRemaining: .balance("12.50"),
             windows: [
                 UsageWindow(
                     id: "weekly",
@@ -69,6 +70,7 @@ final class MenuBarTextTests: XCTestCase {
         let presentation = QuotaProgressPresentation(snapshot: snapshot, error: nil, now: now)
 
         XCTAssertEqual(presentation.planValue, "Pro")
+        XCTAssertEqual(presentation.creditsRemainingValue, "12.50")
         XCTAssertEqual(presentation.quotaValue, "81%")
         XCTAssertEqual(try XCTUnwrap(presentation.quotaProgress), 0.81, accuracy: 0.0001)
         XCTAssertEqual(presentation.resetValue, "2d 0h")
@@ -138,6 +140,41 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertEqual(view.frame.size.height, QuotaProgressMenuView.height)
         XCTAssertTrue(textValues(in: view).contains("Plan"))
         XCTAssertTrue(textValues(in: view).contains("Unavailable"))
+    }
+
+    func testProgressMenuShowsCreditsRemainingOnlyWhenAvailable() {
+        let visible = QuotaProgressMenuView(
+            presentation: QuotaProgressPresentation(
+                snapshot: UsageSnapshot(creditsRemaining: .balance("-1.25"), windows: []),
+                error: nil,
+                now: .now
+            )
+        )
+        let hidden = QuotaProgressMenuView(
+            presentation: QuotaProgressPresentation(
+                snapshot: UsageSnapshot(windows: []),
+                error: nil,
+                now: .now
+            )
+        )
+
+        XCTAssertTrue(textValues(in: visible).contains("Credits remaining"))
+        XCTAssertTrue(textValues(in: visible).contains("-1.25"))
+        XCTAssertFalse(textValues(in: hidden).contains("Credits remaining"))
+        XCTAssertEqual(
+            visible.frame.height,
+            QuotaProgressMenuView.height + QuotaProgressMenuView.creditsRemainingHeightIncrement
+        )
+    }
+
+    func testProgressPresentationShowsUnlimitedCredits() {
+        let presentation = QuotaProgressPresentation(
+            snapshot: UsageSnapshot(creditsRemaining: .unlimited, windows: []),
+            error: nil,
+            now: .now
+        )
+
+        XCTAssertEqual(presentation.creditsRemainingValue, "Unlimited")
     }
 
     func testResetCreditsShowAvailableCountIncludingZeroAndHideWhenMissing() {

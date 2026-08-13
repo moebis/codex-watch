@@ -21,6 +21,7 @@ final class CodexUsageClientTests: XCTestCase {
 
         XCTAssertEqual(snapshot.windows.count, 1)
         XCTAssertEqual(snapshot.plan, .plus)
+        XCTAssertEqual(snapshot.creditsRemaining, .balance("100"))
         XCTAssertEqual(snapshot.windows.first?.kind, .weekly)
         XCTAssertEqual(snapshot.windows.first?.usedPercent, 5)
         XCTAssertEqual(snapshot.windows.first?.durationSeconds, 604_800)
@@ -68,6 +69,47 @@ final class CodexUsageClientTests: XCTestCase {
 
         XCTAssertNil(unknown.plan)
         XCTAssertNil(missing.plan)
+    }
+
+    func testMissingEntitlementOrInvalidCreditsBalanceIsNotFabricated() throws {
+        for json in [
+            #"{}"#,
+            #"{"credits":{}}"#,
+            #"{"credits":{"has_credits":"yes","unlimited":false,"balance":"10"}}"#,
+            #"{"credits":{"has_credits":false,"unlimited":false,"balance":"10"}}"#,
+            #"{"credits":{"has_credits":true,"unlimited":false,"balance":""}}"#,
+            #"{"credits":{"has_credits":true,"unlimited":false,"balance":"NaN"}}"#,
+            #"{"credits":{"has_credits":true,"unlimited":false,"balance":"not-a-number"}}"#
+        ] {
+            let snapshot = try JSONDecoder().decode(
+                UsageResponseDTO.self,
+                from: Data(json.utf8)
+            ).snapshot()
+            XCTAssertNil(snapshot.creditsRemaining)
+        }
+    }
+
+    func testNumericAndNegativeCreditsBalancesAreAccepted() throws {
+        let positive = try JSONDecoder().decode(
+            UsageResponseDTO.self,
+            from: Data(#"{"credits":{"has_credits":true,"unlimited":false,"balance":2.5}}"#.utf8)
+        ).snapshot()
+        let negative = try JSONDecoder().decode(
+            UsageResponseDTO.self,
+            from: Data(#"{"credits":{"has_credits":true,"unlimited":false,"balance":"-1.25"}}"#.utf8)
+        ).snapshot()
+
+        XCTAssertEqual(positive.creditsRemaining, .balance("2.5"))
+        XCTAssertEqual(negative.creditsRemaining, .balance("-1.25"))
+    }
+
+    func testUnlimitedCreditsTakePrecedenceOverBalance() throws {
+        let snapshot = try JSONDecoder().decode(
+            UsageResponseDTO.self,
+            from: Data(#"{"credits":{"has_credits":true,"unlimited":true,"balance":"10"}}"#.utf8)
+        ).snapshot()
+
+        XCTAssertEqual(snapshot.creditsRemaining, .unlimited)
     }
 
     func testResetCreditDetailsAddNextSupportedAvailableExpiry() async throws {

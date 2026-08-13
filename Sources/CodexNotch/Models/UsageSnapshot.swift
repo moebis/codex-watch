@@ -70,6 +70,7 @@ struct UsageWindow: Equatable, Identifiable, Sendable {
 
 struct UsageSnapshot: Equatable, Sendable {
     let plan: ChatGPTPlan?
+    let creditsRemaining: CreditsRemaining?
     let windows: [UsageWindow]
     let availableResetCredits: Int?
     let nextResetCreditGrantedAt: Date?
@@ -78,6 +79,7 @@ struct UsageSnapshot: Equatable, Sendable {
 
     init(
         plan: ChatGPTPlan? = nil,
+        creditsRemaining: CreditsRemaining? = nil,
         windows: [UsageWindow],
         availableResetCredits: Int? = nil,
         nextResetCreditGrantedAt: Date? = nil,
@@ -85,6 +87,7 @@ struct UsageSnapshot: Equatable, Sendable {
         fetchedAt: Date = .now
     ) {
         self.plan = plan
+        self.creditsRemaining = creditsRemaining
         self.windows = windows
         self.availableResetCredits = availableResetCredits
         self.nextResetCreditGrantedAt = nextResetCreditGrantedAt
@@ -103,12 +106,25 @@ struct UsageSnapshot: Equatable, Sendable {
         let hasAvailableCredits = (availableResetCredits ?? 0) > 0
         return UsageSnapshot(
             plan: plan,
+            creditsRemaining: creditsRemaining,
             windows: windows,
             availableResetCredits: availableResetCredits,
             nextResetCreditGrantedAt: hasAvailableCredits ? details.nextGrantedAt : nil,
             nextResetCreditExpiry: hasAvailableCredits ? details.nextExpiry : nil,
             fetchedAt: fetchedAt
         )
+    }
+}
+
+enum CreditsRemaining: Equatable, Sendable {
+    case balance(String)
+    case unlimited
+
+    var displayValue: String {
+        switch self {
+        case let .balance(value): value
+        case .unlimited: "Unlimited"
+        }
     }
 }
 

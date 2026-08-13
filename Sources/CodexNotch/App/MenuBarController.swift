@@ -273,6 +273,7 @@ enum MenuBarText {
 
 struct QuotaProgressPresentation: Equatable {
     let planValue: String
+    let creditsRemainingValue: String?
     let quotaValue: String
     let quotaProgress: Double?
     let resetValue: String
@@ -284,6 +285,7 @@ struct QuotaProgressPresentation: Equatable {
 
     init(snapshot: UsageSnapshot?, error: MenuBarErrorState?, now: Date) {
         planValue = snapshot?.plan?.displayName ?? "Unavailable"
+        creditsRemainingValue = snapshot?.creditsRemaining?.displayValue
         resetCreditsValue = snapshot?.availableResetCredits.map { "\($0) available" }
         resetCreditsDetail = MenuBarText.resetCreditExpiryLine(snapshot: snapshot)
         resetCreditsProgress = Self.resetCreditProgress(snapshot: snapshot, now: now)
@@ -375,22 +377,25 @@ final class NeutralProgressIndicator: NSProgressIndicator {
 
 final class QuotaProgressMenuView: NSView {
     static let width: CGFloat = 260
+    static let creditsRemainingHeightIncrement: CGFloat = 22
     static let height: CGFloat = 138
     static let heightWithResetCredits: CGFloat = 146
     static let heightWithResetCreditExpiry: CGFloat = 168
     static let heightWithResetCreditProgress: CGFloat = 180
 
     init(presentation: QuotaProgressPresentation) {
-        let viewHeight: CGFloat
+        let baseHeight: CGFloat
         if presentation.resetCreditsProgress != nil {
-            viewHeight = Self.heightWithResetCreditProgress
+            baseHeight = Self.heightWithResetCreditProgress
         } else if presentation.resetCreditsDetail != nil {
-            viewHeight = Self.heightWithResetCreditExpiry
+            baseHeight = Self.heightWithResetCreditExpiry
         } else if presentation.resetCreditsValue != nil {
-            viewHeight = Self.heightWithResetCredits
+            baseHeight = Self.heightWithResetCredits
         } else {
-            viewHeight = Self.height
+            baseHeight = Self.height
         }
+        let viewHeight = baseHeight
+            + (presentation.creditsRemainingValue == nil ? 0 : Self.creditsRemainingHeightIncrement)
         super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: viewHeight))
         translatesAutoresizingMaskIntoConstraints = false
 
@@ -415,6 +420,12 @@ final class QuotaProgressMenuView: NSView {
 
         for view in [planRow, quotaRow, quotaBar, resetRow, resetBar] {
             view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        }
+
+        if let creditsRemainingValue = presentation.creditsRemainingValue {
+            let creditsRemainingRow = Self.labelRow(title: "Credits remaining", value: creditsRemainingValue)
+            stack.insertArrangedSubview(creditsRemainingRow, at: 1)
+            creditsRemainingRow.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
 
         if let detail = presentation.resetDetail {

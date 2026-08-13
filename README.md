@@ -6,6 +6,7 @@ CodexNotch is a small, native macOS menu bar app that shows your remaining weekl
 
 - Displays `68%` beside a system icon in the macOS menu bar.
 - Shows the server-reported ChatGPT plan in the expanded menu when it is recognized.
+- Shows the server-reported ChatGPT credits remaining when the usage response provides a valid value.
 - Visualizes the remaining weekly quota and time until weekly reset with two progress bars.
 - Shows available rate-limit reset credits and visualizes time remaining until the next expiry when ChatGPT provides exact grant and expiry metadata.
 - Refreshes automatically every 60 seconds and supports manual refresh.
