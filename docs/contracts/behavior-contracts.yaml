@@ -164,7 +164,7 @@ contracts:
       include: [usage-parsing, status-menu]
       exclude: [hover-popover, token-estimation, plan-sub-tier-inference, additional-network-data]
     examples:
-      positive: A plan_type of pro displays Plan and Pro above the weekly quota row.
+      positive: A plan_type of pro displays Plan and Pro, while prolite displays Plan and Pro Lite, above the weekly quota row.
       negative: An unknown plan is displayed verbatim, or 68 percent remaining is converted into a fabricated token count.
     guards:
       - Tests/CodexNotchTests/CodexUsageClientTests.swift

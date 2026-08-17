@@ -71,6 +71,15 @@ final class CodexUsageClientTests: XCTestCase {
         XCTAssertNil(missing.plan)
     }
 
+    func testProLitePlanIsRecognized() throws {
+        let snapshot = try JSONDecoder().decode(
+            UsageResponseDTO.self,
+            from: Data(#"{"plan_type":"prolite"}"#.utf8)
+        ).snapshot()
+
+        XCTAssertEqual(snapshot.plan, .proLite)
+    }
+
     func testMissingEntitlementOrInvalidCreditsBalanceIsNotFabricated() throws {
         for json in [
             #"{}"#,

@@ -5,6 +5,7 @@ enum ChatGPTPlan: Equatable, Sendable {
     case go
     case plus
     case pro
+    case proLite
     case business
     case enterprise
     case edu
@@ -15,6 +16,7 @@ enum ChatGPTPlan: Equatable, Sendable {
         case "go": self = .go
         case "plus": self = .plus
         case "pro": self = .pro
+        case "prolite": self = .proLite
         case "business": self = .business
         case "enterprise": self = .enterprise
         case "edu": self = .edu
@@ -28,6 +30,7 @@ enum ChatGPTPlan: Equatable, Sendable {
         case .go: "Go"
         case .plus: "Plus"
         case .pro: "Pro"
+        case .proLite: "Pro Lite"
         case .business: "Business"
         case .enterprise: "Enterprise"
         case .edu: "Edu"

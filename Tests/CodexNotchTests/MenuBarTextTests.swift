@@ -80,7 +80,7 @@ final class MenuBarTextTests: XCTestCase {
 
     func testPlanDisplayUsesNormalizedNameAndNeverExposesUnknownValues() {
         let known = QuotaProgressPresentation(
-            snapshot: UsageSnapshot(plan: .business, windows: []),
+            snapshot: UsageSnapshot(plan: .proLite, windows: []),
             error: nil,
             now: .now
         )
@@ -90,7 +90,7 @@ final class MenuBarTextTests: XCTestCase {
             now: .now
         )
 
-        XCTAssertEqual(known.planValue, "Business")
+        XCTAssertEqual(known.planValue, "Pro Lite")
         XCTAssertEqual(missing.planValue, "Unavailable")
     }
 
