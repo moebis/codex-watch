@@ -71,13 +71,37 @@ struct UsageWindow: Equatable, Identifiable, Sendable {
     }
 }
 
+struct NamedUsageWindow: Equatable, Identifiable, Sendable {
+    let id: String
+    let title: String
+    let window: UsageWindow
+}
+
+struct ResetCredit: Equatable, Identifiable, Sendable {
+    let id: String
+    let status: String
+    let title: String?
+    let grantedAt: Date?
+    let expiresAt: Date?
+    let isSupportedByPlan: Bool?
+}
+
+struct SpendControlSummary: Equatable, Sendable {
+    let limit: Decimal
+    let used: Decimal
+    let remainingPercent: Double?
+    let resetsAt: Date?
+}
+
 struct UsageSnapshot: Equatable, Sendable {
     let plan: ChatGPTPlan?
     let creditsRemaining: CreditsRemaining?
     let windows: [UsageWindow]
-    let availableResetCredits: Int?
-    let nextResetCreditGrantedAt: Date?
-    let nextResetCreditExpiry: Date?
+    let additionalWindows: [NamedUsageWindow]
+    let codeReviewWindows: [NamedUsageWindow]
+    let resetCredits: [ResetCredit]
+    let spendControl: SpendControlSummary?
+    private let reportedAvailableResetCredits: Int?
     let analytics: UsageAnalyticsSummary?
     let fetchedAt: Date
 
@@ -85,6 +109,10 @@ struct UsageSnapshot: Equatable, Sendable {
         plan: ChatGPTPlan? = nil,
         creditsRemaining: CreditsRemaining? = nil,
         windows: [UsageWindow],
+        additionalWindows: [NamedUsageWindow] = [],
+        codeReviewWindows: [NamedUsageWindow] = [],
+        resetCredits: [ResetCredit] = [],
+        spendControl: SpendControlSummary? = nil,
         availableResetCredits: Int? = nil,
         nextResetCreditGrantedAt: Date? = nil,
         nextResetCreditExpiry: Date? = nil,
@@ -94,11 +122,37 @@ struct UsageSnapshot: Equatable, Sendable {
         self.plan = plan
         self.creditsRemaining = creditsRemaining
         self.windows = windows
-        self.availableResetCredits = availableResetCredits
-        self.nextResetCreditGrantedAt = nextResetCreditGrantedAt
-        self.nextResetCreditExpiry = nextResetCreditExpiry
+        self.additionalWindows = additionalWindows
+        self.codeReviewWindows = codeReviewWindows
+        self.spendControl = spendControl
+        self.reportedAvailableResetCredits = availableResetCredits
+        if resetCredits.isEmpty,
+           nextResetCreditGrantedAt != nil || nextResetCreditExpiry != nil {
+            self.resetCredits = [ResetCredit(
+                id: "legacy-next-reset-credit",
+                status: "available",
+                title: nil,
+                grantedAt: nextResetCreditGrantedAt,
+                expiresAt: nextResetCreditExpiry,
+                isSupportedByPlan: true
+            )]
+        } else {
+            self.resetCredits = resetCredits
+        }
         self.analytics = analytics
         self.fetchedAt = fetchedAt
+    }
+
+    var availableResetCredits: Int? {
+        reportedAvailableResetCredits
+    }
+
+    var nextResetCreditGrantedAt: Date? {
+        nextAvailableResetCredit?.grantedAt
+    }
+
+    var nextResetCreditExpiry: Date? {
+        nextAvailableResetCredit?.expiresAt
     }
 
     var weeklyWindow: UsageWindow? {
@@ -108,15 +162,16 @@ struct UsageSnapshot: Equatable, Sendable {
         }
     }
 
-    func adding(resetCreditDetails details: ResetCreditDetails) -> UsageSnapshot {
-        let hasAvailableCredits = (availableResetCredits ?? 0) > 0
+    func adding(resetCredits newResetCredits: [ResetCredit]) -> UsageSnapshot {
         return UsageSnapshot(
             plan: plan,
             creditsRemaining: creditsRemaining,
             windows: windows,
+            additionalWindows: additionalWindows,
+            codeReviewWindows: codeReviewWindows,
+            resetCredits: newResetCredits,
+            spendControl: spendControl,
             availableResetCredits: availableResetCredits,
-            nextResetCreditGrantedAt: hasAvailableCredits ? details.nextGrantedAt : nil,
-            nextResetCreditExpiry: hasAvailableCredits ? details.nextExpiry : nil,
             analytics: analytics,
             fetchedAt: fetchedAt
         )
@@ -127,12 +182,23 @@ struct UsageSnapshot: Equatable, Sendable {
             plan: plan,
             creditsRemaining: creditsRemaining,
             windows: windows,
+            additionalWindows: additionalWindows,
+            codeReviewWindows: codeReviewWindows,
+            resetCredits: resetCredits,
+            spendControl: spendControl,
             availableResetCredits: availableResetCredits,
-            nextResetCreditGrantedAt: nextResetCreditGrantedAt,
-            nextResetCreditExpiry: nextResetCreditExpiry,
             analytics: newAnalytics ?? analytics,
             fetchedAt: fetchedAt
         )
+    }
+
+    private var nextAvailableResetCredit: ResetCredit? {
+        resetCredits
+            .filter { $0.status == "available" && $0.isSupportedByPlan != false }
+            .filter { $0.expiresAt != nil }
+            .min { lhs, rhs in
+                lhs.expiresAt ?? .distantFuture < rhs.expiresAt ?? .distantFuture
+            }
     }
 }
 
@@ -146,11 +212,6 @@ enum CreditsRemaining: Equatable, Sendable {
         case .unlimited: "Unlimited"
         }
     }
-}
-
-struct ResetCreditDetails: Equatable, Sendable {
-    let nextGrantedAt: Date?
-    let nextExpiry: Date?
 }
 
 enum WeeklyQuotaLevel: Equatable, Sendable {

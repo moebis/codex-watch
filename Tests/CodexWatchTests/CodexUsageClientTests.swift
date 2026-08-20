@@ -321,6 +321,8 @@ final class CodexUsageClientTests: XCTestCase {
         let snapshot = try await makeClient().fetch()
 
         XCTAssertEqual(snapshot.availableResetCredits, 2)
+        XCTAssertEqual(snapshot.resetCredits.count, 4)
+        XCTAssertEqual(snapshot.resetCredits.filter { $0.status == "available" }.count, 3)
         XCTAssertEqual(
             snapshot.nextResetCreditGrantedAt,
             ISO8601DateFormatter().date(from: "2029-12-03T08:30:45Z")

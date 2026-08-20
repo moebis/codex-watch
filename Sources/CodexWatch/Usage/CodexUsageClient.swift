@@ -120,16 +120,16 @@ struct CodexUsageClient {
         // endpoint change, entitlement difference, or transient failure.
         guard let count = snapshot.availableResetCredits,
               count > 0,
-              let details = try? await fetchResetCreditDetails() else {
+              let resetCredits = try? await fetchResetCredits() else {
             return snapshot
         }
-        return snapshot.adding(resetCreditDetails: details)
+        return snapshot.adding(resetCredits: resetCredits)
     }
 
-    private func fetchResetCreditDetails() async throws -> ResetCreditDetails {
+    private func fetchResetCredits() async throws -> [ResetCredit] {
         let data = try await fetchData(from: resetCreditsEndpoint, timeoutInterval: 5)
         do {
-            return try JSONDecoder().decode(ResetCreditDetailsDTO.self, from: data).details()
+            return try JSONDecoder().decode(ResetCreditDetailsDTO.self, from: data).inventory()
         } catch {
             throw CodexUsageError.decodingFailed
         }
