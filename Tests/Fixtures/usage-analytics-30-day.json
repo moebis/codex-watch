@@ -1,0 +1,35 @@
+{
+  "data": [
+    {
+      "date": "2026-08-19",
+      "totals": {
+        "users": 1,
+        "threads": 2,
+        "turns": 10,
+        "credits": 4.5,
+        "uncached_text_input_tokens": 1000,
+        "cached_text_input_tokens": 2000,
+        "text_output_tokens": 3000,
+        "text_total_tokens": 6000
+      },
+      "clients": [],
+      "models": []
+    },
+    {
+      "date": "2026-08-20",
+      "totals": {
+        "users": 1,
+        "threads": 3,
+        "turns": 12,
+        "credits": 5.5,
+        "uncached_text_input_tokens": 1500,
+        "cached_text_input_tokens": 2500,
+        "text_output_tokens": 4000,
+        "text_total_tokens": 8000
+      },
+      "clients": [],
+      "models": []
+    }
+  ],
+  "group_by": "day"
+}

@@ -5,14 +5,17 @@ enum MenuBarButtonStyle {
     static let fontSize: CGFloat = 12
 
     static func apply(to button: NSButton) {
-        let image = NSImage(systemSymbolName: "chart.pie.fill", accessibilityDescription: "Codex quota")
+        let image = NSImage(
+            systemSymbolName: "chart.pie.fill",
+            accessibilityDescription: "Codex Watch quota"
+        )
         image?.isTemplate = true
         button.image = image
         button.imagePosition = .imageLeading
         button.imageHugsTitle = true
         button.alignment = .center
         button.font = .monospacedDigitSystemFont(ofSize: fontSize, weight: .medium)
-        button.toolTip = "Codex weekly quota"
+        button.toolTip = "Codex Watch weekly quota"
     }
 }
 
@@ -26,6 +29,7 @@ final class MenuBarController: NSObject {
     private var refreshTask: Task<Void, Never>?
     private var snapshot: UsageSnapshot?
     private var errorState: MenuBarErrorState?
+    private var lastAnalyticsAttempt: Date?
 
     init(
         statusItem: NSStatusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength),
@@ -41,12 +45,12 @@ final class MenuBarController: NSObject {
     func start() {
         configureStatusButton()
         rebuildMenu()
-        refresh()
+        refresh(manual: true)
         refreshTimer = Timer.scheduledTimer(
             withTimeInterval: Self.refreshInterval,
             repeats: true
         ) { [weak self] _ in
-            self?.refresh()
+            self?.refresh(manual: false)
         }
     }
 
@@ -66,20 +70,35 @@ final class MenuBarController: NSObject {
     }
 
     @objc private func refreshNow() {
-        refresh()
+        refresh(manual: true)
     }
 
-    private func refresh() {
+    private func refresh(manual: Bool) {
         refreshTask?.cancel()
         let reader = authReader
         let session = self.session
+        let now = Date.now
+        let shouldFetchAnalytics = AnalyticsRefreshPolicy.shouldRefresh(
+            lastAttempt: lastAnalyticsAttempt,
+            now: now,
+            manual: manual
+        )
+        if shouldFetchAnalytics {
+            lastAnalyticsAttempt = now
+        }
+        let previousAnalytics = snapshot?.analytics
         refreshTask = Task { [weak self] in
             do {
                 let credentials = try reader.read()
-                let value = try await CodexUsageClient(
+                let client = CodexUsageClient(
                     credentials: credentials,
                     session: session
-                ).fetch()
+                )
+                let quotaSnapshot = try await client.fetch()
+                let analytics = shouldFetchAnalytics
+                    ? try? await client.fetchAnalytics(referenceDate: now)
+                    : previousAnalytics
+                let value = quotaSnapshot.adding(analytics: analytics ?? previousAnalytics)
                 guard !Task.isCancelled else { return }
                 await MainActor.run { [weak self] in
                     self?.apply(snapshot: value)
@@ -125,15 +144,31 @@ final class MenuBarController: NSObject {
         )
         menu.addItem(progressItem)
 
+        if let analytics = snapshot?.analytics {
+            menu.addItem(.separator())
+            let analyticsItem = NSMenuItem()
+            analyticsItem.view = UsageAnalyticsMenuView(
+                presentation: UsageAnalyticsPresentation(summary: analytics)
+            )
+            menu.addItem(analyticsItem)
+        }
+
         menu.addItem(.separator())
         menu.addItem(actionItem(title: "Refresh Now", action: #selector(refreshNow), keyEquivalent: "r"))
         menu.addItem(actionItem(title: "Open ChatGPT", action: #selector(openChatGPT), keyEquivalent: "o"))
+        menu.addItem(
+            actionItem(
+                title: "Open Usage Analytics…",
+                action: #selector(openUsageAnalytics),
+                keyEquivalent: ""
+            )
+        )
         menu.addItem(.separator())
         let versionItem = NSMenuItem(title: "Version \(AppIdentity.version)", action: nil, keyEquivalent: "")
         versionItem.isEnabled = false
         menu.addItem(versionItem)
         menu.addItem(.separator())
-        menu.addItem(actionItem(title: "Quit CodexNotch", action: #selector(quit), keyEquivalent: "q"))
+        menu.addItem(actionItem(title: "Quit Codex Watch", action: #selector(quit), keyEquivalent: "q"))
         statusItem.menu = menu
     }
 
@@ -148,6 +183,10 @@ final class MenuBarController: NSObject {
             withBundleIdentifier: AppIdentity.chatGPTCodexBundleIdentifier
         ) else { return }
         NSWorkspace.shared.open(appURL)
+    }
+
+    @objc private func openUsageAnalytics() {
+        NSWorkspace.shared.open(AppIdentity.usageAnalyticsURL)
     }
 
     @objc private func quit() {

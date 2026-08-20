@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "CodexNotch",
+    name: "CodexWatch",
     platforms: [.macOS(.v14)],
-    products: [.executable(name: "CodexNotch", targets: ["CodexNotch"])],
+    products: [.executable(name: "CodexWatch", targets: ["CodexWatch"])],
     targets: [
-        .executableTarget(name: "CodexNotch"),
-        .testTarget(name: "CodexNotchTests", dependencies: ["CodexNotch"])
+        .executableTarget(name: "CodexWatch"),
+        .testTarget(name: "CodexWatchTests", dependencies: ["CodexWatch"])
     ],
     swiftLanguageVersions: [.v5]
 )

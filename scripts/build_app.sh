@@ -2,7 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PRODUCT_NAME="CodexNotch"
+PRODUCT_NAME="CodexWatch"
+APP_NAME="Codex Watch"
 CONFIGURATION="${CONFIGURATION:-release}"
 DIST_DIR="${1:-${DIST_DIR:-$ROOT_DIR/dist}}"
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
@@ -26,7 +27,7 @@ fi
 swift build "${BUILD_ARGS[@]}"
 BIN_DIR="$(swift build "${BUILD_ARGS[@]}" --show-bin-path)"
 BIN_PATH="$BIN_DIR/$PRODUCT_NAME"
-APP_PATH="$DIST_DIR/$PRODUCT_NAME.app"
+APP_PATH="$DIST_DIR/$APP_NAME.app"
 
 if [[ ! -x "$BIN_PATH" ]]; then
     echo "error: built executable not found at $BIN_PATH" >&2
@@ -37,7 +38,7 @@ rm -rf "$APP_PATH"
 mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Resources"
 cp "$BIN_PATH" "$APP_PATH/Contents/MacOS/$PRODUCT_NAME"
 cp "$ROOT_DIR/Resources/Info.plist" "$APP_PATH/Contents/Info.plist"
-"$ROOT_DIR/scripts/build_icon.sh" "$APP_PATH/Contents/Resources/CodexNotch.icns"
+"$ROOT_DIR/scripts/build_icon.sh" "$APP_PATH/Contents/Resources/CodexWatch.icns"
 
 if [[ "$SIGN_IDENTITY" != "none" ]]; then
     if [[ "$SIGN_IDENTITY" == "-" ]]; then

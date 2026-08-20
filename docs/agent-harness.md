@@ -5,7 +5,7 @@ created_at: 2026-07-19
 last_verified_commit: 23b1418
 ---
 
-# CodexNotch change harness
+# Codex Watch change harness
 
 ## Purpose
 

@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 import XCTest
-@testable import CodexNotch
+@testable import CodexWatch
 
 final class MenuBarTextTests: XCTestCase {
     func testMenuDoesNotOfferRepositoryUpdateChecks() {
@@ -20,6 +20,108 @@ final class MenuBarTextTests: XCTestCase {
         let menuTitles = statusItem.menu?.items.map(\.title) ?? []
 
         XCTAssertFalse(menuTitles.contains { $0.localizedCaseInsensitiveContains("update") })
+    }
+
+    func testMenuOffersOfficialUsageAnalyticsWithoutRestoringUpdates() {
+        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let controller = MenuBarController(
+            statusItem: statusItem,
+            authReader: CodexAuthReader(
+                environment: [:],
+                homeDirectory: URL(fileURLWithPath: "/definitely/not/the-test-home")
+            ),
+            session: URLSession(configuration: .ephemeral)
+        )
+        controller.start()
+        defer { controller.stop() }
+
+        let menuTitles = statusItem.menu?.items.map(\.title) ?? []
+
+        XCTAssertTrue(menuTitles.contains("Open Usage Analytics…"))
+        XCTAssertFalse(menuTitles.contains { $0.localizedCaseInsensitiveContains("update") })
+        XCTAssertEqual(
+            AppIdentity.usageAnalyticsURL.absoluteString,
+            "https://chatgpt.com/codex/cloud/settings/analytics#usage"
+        )
+    }
+
+    func testAnalyticsRefreshPolicyLimitsAutomaticRequestsButAllowsManualRefresh() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+
+        XCTAssertTrue(AnalyticsRefreshPolicy.shouldRefresh(lastAttempt: nil, now: now, manual: false))
+        XCTAssertFalse(
+            AnalyticsRefreshPolicy.shouldRefresh(
+                lastAttempt: now.addingTimeInterval(-899),
+                now: now,
+                manual: false
+            )
+        )
+        XCTAssertTrue(
+            AnalyticsRefreshPolicy.shouldRefresh(
+                lastAttempt: now.addingTimeInterval(-900),
+                now: now,
+                manual: false
+            )
+        )
+        XCTAssertTrue(
+            AnalyticsRefreshPolicy.shouldRefresh(
+                lastAttempt: now,
+                now: now,
+                manual: true
+            )
+        )
+    }
+
+    func testUsageAnalyticsPresentationFormatsSixTruthfulThirtyDayMetrics() {
+        let summary = UsageAnalyticsSummary(
+            periodStart: Date(timeIntervalSince1970: 1_776_643_200),
+            periodEnd: Date(timeIntervalSince1970: 1_779_148_800),
+            totalTokens: 30_300_000_000,
+            uncachedInputTokens: 1_200_000,
+            cachedInputTokens: 999,
+            outputTokens: 2_345,
+            turns: 3_427,
+            chats: 42,
+            fetchedAt: Date(timeIntervalSince1970: 1_779_153_600)
+        )
+
+        let presentation = UsageAnalyticsPresentation(summary: summary)
+
+        XCTAssertEqual(presentation.title, "Last 30 days")
+        XCTAssertEqual(presentation.totalTokens, "30.3B")
+        XCTAssertEqual(presentation.inputTokens, "1.2M")
+        XCTAssertEqual(presentation.cachedInputTokens, "999")
+        XCTAssertEqual(presentation.outputTokens, "2.3K")
+        XCTAssertEqual(presentation.turns, "3.4K")
+        XCTAssertEqual(presentation.chats, "42")
+    }
+
+    func testUsageAnalyticsMenuContainsSixLabeledRows() {
+        let summary = UsageAnalyticsSummary(
+            periodStart: Date(timeIntervalSince1970: 1_776_643_200),
+            periodEnd: Date(timeIntervalSince1970: 1_779_148_800),
+            totalTokens: 14_000,
+            uncachedInputTokens: 2_500,
+            cachedInputTokens: 4_500,
+            outputTokens: 7_000,
+            turns: 22,
+            chats: 5,
+            fetchedAt: Date(timeIntervalSince1970: 1_779_153_600)
+        )
+
+        let view = UsageAnalyticsMenuView(
+            presentation: UsageAnalyticsPresentation(summary: summary)
+        )
+        let values = textValues(in: view)
+
+        XCTAssertTrue(values.contains("Last 30 days"))
+        XCTAssertTrue(values.contains("Total tokens"))
+        XCTAssertTrue(values.contains("Input tokens"))
+        XCTAssertTrue(values.contains("Cached input"))
+        XCTAssertTrue(values.contains("Output tokens"))
+        XCTAssertTrue(values.contains("Turns"))
+        XCTAssertTrue(values.contains("Chats"))
+        XCTAssertEqual(view.frame.width, UsageAnalyticsMenuView.width)
     }
 
     func testStatusButtonUsesCompactNativeImageAndTitleLayout() {

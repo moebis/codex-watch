@@ -2,20 +2,20 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-SOURCE_PATH="$ROOT_DIR/Resources/AppIcon.svg"
+SOURCE_PATH="$ROOT_DIR/Resources/AppIcon.png"
 OUTPUT_PATH="${1:-}"
 
 [[ -f "$SOURCE_PATH" ]] || { echo "error: icon source missing: $SOURCE_PATH" >&2; exit 1; }
-[[ -n "$OUTPUT_PATH" ]] || { echo "usage: $0 /path/to/CodexNotch.icns" >&2; exit 2; }
+[[ -n "$OUTPUT_PATH" ]] || { echo "usage: $0 /path/to/CodexWatch.icns" >&2; exit 2; }
 
 command -v sips >/dev/null || { echo "error: sips is required to build the app icon" >&2; exit 1; }
 command -v iconutil >/dev/null || { echo "error: iconutil is required to build the app icon" >&2; exit 1; }
 
-ICON_WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/codex-notch-icon.XXXXXX")"
+ICON_WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/codex-watch-icon.XXXXXX")"
 trap 'rm -rf "$ICON_WORKDIR"' EXIT
 
 MASTER_PNG="$ICON_WORKDIR/AppIcon-1024.png"
-ICONSET_PATH="$ICON_WORKDIR/CodexNotch.iconset"
+ICONSET_PATH="$ICON_WORKDIR/CodexWatch.iconset"
 mkdir -p "$ICONSET_PATH" "$(dirname "$OUTPUT_PATH")"
 sips -s format png -z 1024 1024 "$SOURCE_PATH" --out "$MASTER_PNG" >/dev/null
 

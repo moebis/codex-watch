@@ -3,11 +3,11 @@ set -euo pipefail
 
 APP_PATH="${1:-}"
 if [[ -z "$APP_PATH" ]]; then
-    echo "usage: $0 /path/to/CodexNotch.app" >&2
+    echo "usage: $0 '/path/to/Codex Watch.app'" >&2
     exit 2
 fi
 
-EXECUTABLE="$APP_PATH/Contents/MacOS/CodexNotch"
+EXECUTABLE="$APP_PATH/Contents/MacOS/CodexWatch"
 INFO_PLIST="$APP_PATH/Contents/Info.plist"
 
 [[ -d "$APP_PATH" ]] || { echo "error: app not found: $APP_PATH" >&2; exit 1; }
@@ -18,19 +18,28 @@ plutil -lint "$INFO_PLIST"
 
 ICON_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$INFO_PLIST" 2>/dev/null || true)"
 ICON_PATH="$APP_PATH/Contents/Resources/${ICON_NAME}.icns"
-[[ "$ICON_NAME" == "CodexNotch" ]] || {
-    echo "error: CFBundleIconFile must be CodexNotch" >&2
+[[ "$ICON_NAME" == "CodexWatch" ]] || {
+    echo "error: CFBundleIconFile must be CodexWatch" >&2
     exit 1
 }
 [[ -f "$ICON_PATH" ]] || { echo "error: app icon missing: $ICON_PATH" >&2; exit 1; }
 
-ICONSET_DIR="$(mktemp -d "${TMPDIR:-/tmp}/codex-notch-icon-verify.XXXXXX")"
+ICONSET_DIR="$(mktemp -d "${TMPDIR:-/tmp}/codex-watch-icon-verify.XXXXXX")"
 trap 'rm -rf "$ICONSET_DIR"' EXIT
-iconutil -c iconset "$ICON_PATH" -o "$ICONSET_DIR/CodexNotch.iconset"
-[[ -f "$ICONSET_DIR/CodexNotch.iconset/icon_512x512@2x.png" ]] || {
+iconutil -c iconset "$ICON_PATH" -o "$ICONSET_DIR/CodexWatch.iconset"
+[[ -f "$ICONSET_DIR/CodexWatch.iconset/icon_512x512@2x.png" ]] || {
     echo "error: app icon is missing its 1024px representation" >&2
     exit 1
 }
+
+DISPLAY_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$INFO_PLIST")"
+BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO_PLIST")"
+VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")"
+BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")"
+[[ "$DISPLAY_NAME" == "Codex Watch" ]] || { echo "error: unexpected display name" >&2; exit 1; }
+[[ "$BUNDLE_ID" == "com.moebis.codexwatch" ]] || { echo "error: unexpected bundle identifier" >&2; exit 1; }
+[[ "$VERSION" == "1.0.0" ]] || { echo "error: unexpected version" >&2; exit 1; }
+[[ "$BUILD" == "15" ]] || { echo "error: unexpected build number" >&2; exit 1; }
 
 codesign --verify --strict "$APP_PATH"
 

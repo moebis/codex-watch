@@ -14,7 +14,7 @@ contracts:
       positive: The menu bar shows an icon directly adjacent to 68% as one centered unit and opens a small quota menu.
       negative: The icon is pinned to one edge with excessive space before the number, or a transparent panel is positioned around the physical camera notch.
     guards:
-      - Tests/CodexNotchTests/MenuBarTextTests.swift
+      - Tests/CodexWatchTests/MenuBarTextTests.swift
       - "manual: inspect icon and percentage spacing on a real Mac"
     supersedes: []
     superseded_by: null
@@ -35,9 +35,9 @@ contracts:
       positive: A weekly used value of 31.6 produces 68% in the menu bar.
       negative: A five-hour rolling window is presented as weekly quota.
     guards:
-      - Tests/CodexNotchTests/MenuBarTextTests.swift
-      - Tests/CodexNotchTests/UsageWindowClassifierTests.swift
-      - Tests/CodexNotchTests/CodexUsageClientTests.swift
+      - Tests/CodexWatchTests/MenuBarTextTests.swift
+      - Tests/CodexWatchTests/UsageWindowClassifierTests.swift
+      - Tests/CodexWatchTests/CodexUsageClientTests.swift
     supersedes: []
     superseded_by: null
     last_verified_commit: 23b1418
@@ -57,8 +57,8 @@ contracts:
       positive: Ephemeral bounded GET requests obtain usage and reset-credit details, and no response body is persisted.
       negative: A rollout JSONL file is parsed or an authenticated redirect is followed to another host.
     guards:
-      - Tests/CodexNotchTests/CodexAuthReaderTests.swift
-      - Tests/CodexNotchTests/CodexUsageClientTests.swift
+      - Tests/CodexWatchTests/CodexAuthReaderTests.swift
+      - Tests/CodexWatchTests/CodexUsageClientTests.swift
       - "manual: sensitive string and executable dependency review"
     supersedes: []
     superseded_by: null
@@ -102,8 +102,8 @@ contracts:
       positive: With 81 percent quota remaining, two days left in a seven-day weekly window, and 20 days left in a 30-day reset-credit lifetime, the bars show 81 percent, two sevenths, and two thirds remaining.
       negative: A time bar assumes a weekly or reset-credit duration when the endpoint omits the required metadata.
     guards:
-      - Tests/CodexNotchTests/MenuBarTextTests.swift
-      - Tests/CodexNotchTests/CodexUsageClientTests.swift
+      - Tests/CodexWatchTests/MenuBarTextTests.swift
+      - Tests/CodexWatchTests/CodexUsageClientTests.swift
       - "manual: inspect all available progress bars and labels in the open menu on a real Mac"
     supersedes: []
     superseded_by: null
@@ -124,8 +124,8 @@ contracts:
       positive: Two available credits display as 2 available with the earliest supported available expiry in local time and its exact remaining-lifetime progress, while a failed detail request still displays the count.
       negative: A missing grant time is treated as a fixed 30-day duration, or an expired or unsupported credit supplies the displayed expiry.
     guards:
-      - Tests/CodexNotchTests/CodexUsageClientTests.swift
-      - Tests/CodexNotchTests/MenuBarTextTests.swift
+      - Tests/CodexWatchTests/CodexUsageClientTests.swift
+      - Tests/CodexWatchTests/MenuBarTextTests.swift
       - "manual: inspect the reset-credit row in the open menu on a real Mac"
     supersedes: []
     superseded_by: null
@@ -146,8 +146,8 @@ contracts:
       positive: A plan_type of pro displays Plan and Pro, while prolite displays Plan and Pro Lite, above the weekly quota row.
       negative: An unknown plan is displayed verbatim, or 68 percent remaining is converted into a fabricated token count.
     guards:
-      - Tests/CodexNotchTests/CodexUsageClientTests.swift
-      - Tests/CodexNotchTests/MenuBarTextTests.swift
+      - Tests/CodexWatchTests/CodexUsageClientTests.swift
+      - Tests/CodexWatchTests/MenuBarTextTests.swift
       - "manual: inspect the Plan row in the open menu on a real Mac"
     supersedes: []
     superseded_by: null
@@ -168,9 +168,31 @@ contracts:
       positive: A credits.balance of -1.25 with has_credits true displays Credits remaining and -1.25, while unlimited true displays Unlimited.
       negative: A missing entitlement displays zero, or approximate message counts are added to the menu.
     guards:
-      - Tests/CodexNotchTests/CodexUsageClientTests.swift
-      - Tests/CodexNotchTests/MenuBarTextTests.swift
+      - Tests/CodexWatchTests/CodexUsageClientTests.swift
+      - Tests/CodexWatchTests/MenuBarTextTests.swift
       - "manual: compare the Credits remaining row with the ChatGPT Usage Dashboard on a real Mac"
+    supersedes: []
+    superseded_by: null
+    last_verified_commit: pending
+
+  - id: USAGE-ANALYTICS-010
+    title: The menu shows only bounded server-reported aggregate usage
+    status: active
+    statement: Codex Watch may request the inclusive trailing 30 calendar days of daily aggregate usage from the authenticated ChatGPT HTTPS host and display the summed total, uncached-input, cached-input, and output tokens plus turns and threads. The app accepts only day-grouped rows with valid unique dates inside the requested interval and complete nonnegative non-overflowing totals, keeps the result only in process memory, refreshes it at launch and on manual refresh but no more than once every 15 minutes automatically, and preserves weekly quota plus any prior in-memory aggregate when the analytics request fails. It never scans local sessions, reads prompts, scrapes HTML, or fabricates lifetime totals, streaks, or profile statistics.
+    rationale: Server aggregates provide useful absolute usage detail without exposing conversation content, while bounded decoding and best-effort refresh preserve the app's narrow privacy and reliability boundary.
+    source: user-confirmed-and-observed-official-product
+    owner: project-maintainer
+    risk: high
+    scope:
+      include: [usage-analytics, usage-parsing, status-menu, network-session]
+      exclude: [session-scanning, prompt-reading, telemetry, html-scraping, lifetime-inference]
+    examples:
+      positive: Two complete daily rows are summed into truthful 30-day token, turn, and chat totals and a later analytics failure leaves the weekly quota working.
+      negative: A missing input-token field is treated as zero, a negative total is displayed, or rollout files are parsed to reconstruct lifetime usage.
+    guards:
+      - Tests/CodexWatchTests/CodexUsageClientTests.swift
+      - Tests/CodexWatchTests/MenuBarTextTests.swift
+      - "manual: compare the 30-day rows with the official Codex Usage Analytics page"
     supersedes: []
     superseded_by: null
     last_verified_commit: pending

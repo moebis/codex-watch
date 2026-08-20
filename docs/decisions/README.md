@@ -6,3 +6,4 @@ Only active decisions that materially constrain future implementation belong her
 |---|---|---|
 | [004-menu-bar-only](004-menu-bar-only.md) | active | `MENU-BAR-001`, `PRIVACY-BOUNDARY-003` |
 | [006-reset-credit-expiry](006-reset-credit-expiry.md) | active | `PRIVACY-BOUNDARY-003`, `RESET-CREDITS-006` |
+| [007-usage-analytics](007-usage-analytics.md) | active | `PRIVACY-BOUNDARY-003`, `USAGE-ANALYTICS-010` |

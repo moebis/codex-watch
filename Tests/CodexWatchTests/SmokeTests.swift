@@ -1,8 +1,8 @@
 import XCTest
-@testable import CodexNotch
+@testable import CodexWatch
 
 final class SmokeTests: XCTestCase {
     func testApplicationIdentifierIsStable() {
-        XCTAssertEqual(AppIdentity.bundleIdentifier, "com.david.codexnotch")
+        XCTAssertEqual(AppIdentity.bundleIdentifier, "com.moebis.codexwatch")
     }
 }

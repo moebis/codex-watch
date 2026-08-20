@@ -44,22 +44,66 @@ private final class SameHostHTTPSRedirectDelegate: NSObject, URLSessionTaskDeleg
 struct CodexUsageClient {
     static let defaultEndpoint = URL(string: "https://chatgpt.com/backend-api/wham/usage")!
     static let resetCreditsPath = "/backend-api/wham/rate-limit-reset-credits"
+    static let analyticsPath = "/backend-api/wham/analytics/daily-workspace-usage-counts"
     static let maximumResponseSize = 1_048_576
 
     let credentials: CodexCredentials
     let session: URLSession
     let endpoint: URL
     let resetCreditsEndpoint: URL
+    let analyticsEndpoint: URL
 
     init(credentials: CodexCredentials,
          session: URLSession = SecureUsageSession.make(),
          endpoint: URL = CodexUsageClient.defaultEndpoint,
-         resetCreditsEndpoint: URL? = nil) {
+         resetCreditsEndpoint: URL? = nil,
+         analyticsEndpoint: URL? = nil) {
         self.credentials = credentials
         self.session = session
         self.endpoint = endpoint
         self.resetCreditsEndpoint = resetCreditsEndpoint
             ?? endpoint.deletingLastPathComponent().appendingPathComponent("rate-limit-reset-credits")
+        self.analyticsEndpoint = analyticsEndpoint ?? Self.defaultAnalyticsEndpoint(from: endpoint)
+    }
+
+    func fetchAnalytics(
+        referenceDate: Date = .now,
+        calendar: Calendar = .current
+    ) async throws -> UsageAnalyticsSummary {
+        let periodEnd = calendar.startOfDay(for: referenceDate)
+        guard let periodStart = calendar.date(byAdding: .day, value: -29, to: periodEnd),
+              var components = URLComponents(
+                  url: analyticsEndpoint,
+                  resolvingAgainstBaseURL: false
+              ) else {
+            throw CodexUsageError.invalidHTTPResponse
+        }
+        components.queryItems = [
+            URLQueryItem(name: "start_date", value: Self.dateText(periodStart, calendar: calendar)),
+            URLQueryItem(name: "end_date", value: Self.dateText(periodEnd, calendar: calendar)),
+            URLQueryItem(name: "group_by", value: "day"),
+            URLQueryItem(name: "workspace_user", value: "true")
+        ]
+        guard let requestURL = components.url else {
+            throw CodexUsageError.invalidHTTPResponse
+        }
+
+        let data = try await fetchData(from: requestURL)
+        do {
+            let response = try JSONDecoder().decode(UsageAnalyticsResponseDTO.self, from: data)
+            guard let summary = response.summary(
+                periodStart: periodStart,
+                periodEnd: periodEnd,
+                calendar: calendar
+            ) else {
+                throw CodexUsageError.decodingFailed
+            }
+            return summary
+        } catch let error as CodexUsageError {
+            throw error
+        } catch {
+            throw CodexUsageError.decodingFailed
+        }
     }
 
     func fetch() async throws -> UsageSnapshot {
@@ -137,5 +181,23 @@ struct CodexUsageClient {
             data.append(byte)
         }
         return data
+    }
+
+    private static func defaultAnalyticsEndpoint(from endpoint: URL) -> URL {
+        var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false)!
+        components.path = analyticsPath
+        components.query = nil
+        components.fragment = nil
+        return components.url!
+    }
+
+    private static func dateText(_ date: Date, calendar: Calendar) -> String {
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(
+            format: "%04d-%02d-%02d",
+            components.year ?? 0,
+            components.month ?? 0,
+            components.day ?? 0
+        )
     }
 }

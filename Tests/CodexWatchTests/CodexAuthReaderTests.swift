@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import CodexNotch
+@testable import CodexWatch
 
 final class CodexAuthReaderTests: XCTestCase {
     func testEnvironmentDirectoryOverridesHomeDirectory() throws {

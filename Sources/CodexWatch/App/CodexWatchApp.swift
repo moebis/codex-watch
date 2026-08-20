@@ -1,7 +1,7 @@
 import AppKit
 
 @main
-enum CodexNotchApp {
+enum CodexWatchApp {
     static func main() {
         let application = NSApplication.shared
         let delegate = AppDelegate()

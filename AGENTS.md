@@ -1,8 +1,8 @@
-# CodexNotch maintenance guide
+# Codex Watch maintenance guide
 
 ## Product boundary
 
-CodexNotch is a standalone native macOS menu bar app. It displays the remaining weekly ChatGPT Codex quota as a system icon plus percentage. It does not render a notch overlay and does not inspect Codex session or rollout logs.
+Codex Watch is a standalone native macOS menu bar app. It displays the remaining weekly ChatGPT Codex quota as a system icon plus percentage and shows bounded 30-day aggregate token usage in its menu. It does not render a notch overlay and does not inspect Codex session or rollout logs.
 
 ## Required change harness
 

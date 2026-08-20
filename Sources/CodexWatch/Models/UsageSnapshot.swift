@@ -78,6 +78,7 @@ struct UsageSnapshot: Equatable, Sendable {
     let availableResetCredits: Int?
     let nextResetCreditGrantedAt: Date?
     let nextResetCreditExpiry: Date?
+    let analytics: UsageAnalyticsSummary?
     let fetchedAt: Date
 
     init(
@@ -87,6 +88,7 @@ struct UsageSnapshot: Equatable, Sendable {
         availableResetCredits: Int? = nil,
         nextResetCreditGrantedAt: Date? = nil,
         nextResetCreditExpiry: Date? = nil,
+        analytics: UsageAnalyticsSummary? = nil,
         fetchedAt: Date = .now
     ) {
         self.plan = plan
@@ -95,6 +97,7 @@ struct UsageSnapshot: Equatable, Sendable {
         self.availableResetCredits = availableResetCredits
         self.nextResetCreditGrantedAt = nextResetCreditGrantedAt
         self.nextResetCreditExpiry = nextResetCreditExpiry
+        self.analytics = analytics
         self.fetchedAt = fetchedAt
     }
 
@@ -114,6 +117,20 @@ struct UsageSnapshot: Equatable, Sendable {
             availableResetCredits: availableResetCredits,
             nextResetCreditGrantedAt: hasAvailableCredits ? details.nextGrantedAt : nil,
             nextResetCreditExpiry: hasAvailableCredits ? details.nextExpiry : nil,
+            analytics: analytics,
+            fetchedAt: fetchedAt
+        )
+    }
+
+    func adding(analytics newAnalytics: UsageAnalyticsSummary?) -> UsageSnapshot {
+        UsageSnapshot(
+            plan: plan,
+            creditsRemaining: creditsRemaining,
+            windows: windows,
+            availableResetCredits: availableResetCredits,
+            nextResetCreditGrantedAt: nextResetCreditGrantedAt,
+            nextResetCreditExpiry: nextResetCreditExpiry,
+            analytics: newAnalytics ?? analytics,
             fetchedAt: fetchedAt
         )
     }

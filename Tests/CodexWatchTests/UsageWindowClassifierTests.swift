@@ -1,5 +1,5 @@
 import XCTest
-@testable import CodexNotch
+@testable import CodexWatch
 
 final class UsageWindowClassifierTests: XCTestCase {
     func test604800SecondWindowIsWeekly() {
