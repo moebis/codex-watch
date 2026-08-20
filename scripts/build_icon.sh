@@ -11,6 +11,17 @@ OUTPUT_PATH="${1:-}"
 command -v sips >/dev/null || { echo "error: sips is required to build the app icon" >&2; exit 1; }
 command -v iconutil >/dev/null || { echo "error: iconutil is required to build the app icon" >&2; exit 1; }
 
+SOURCE_WIDTH="$(sips -g pixelWidth "$SOURCE_PATH" | awk '/pixelWidth/ { print $2 }')"
+SOURCE_HEIGHT="$(sips -g pixelHeight "$SOURCE_PATH" | awk '/pixelHeight/ { print $2 }')"
+[[ "$SOURCE_WIDTH" == "$SOURCE_HEIGHT" ]] || {
+    echo "error: app icon source must be square" >&2
+    exit 1
+}
+(( SOURCE_WIDTH >= 1024 )) || {
+    echo "error: app icon source must be at least 1024 by 1024 pixels" >&2
+    exit 1
+}
+
 ICON_WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/codex-watch-icon.XXXXXX")"
 trap 'rm -rf "$ICON_WORKDIR"' EXIT
 

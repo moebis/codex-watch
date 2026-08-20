@@ -27,10 +27,35 @@ ICON_PATH="$APP_PATH/Contents/Resources/${ICON_NAME}.icns"
 ICONSET_DIR="$(mktemp -d "${TMPDIR:-/tmp}/codex-watch-icon-verify.XXXXXX")"
 trap 'rm -rf "$ICONSET_DIR"' EXIT
 iconutil -c iconset "$ICON_PATH" -o "$ICONSET_DIR/CodexWatch.iconset"
-[[ -f "$ICONSET_DIR/CodexWatch.iconset/icon_512x512@2x.png" ]] || {
-    echo "error: app icon is missing its 1024px representation" >&2
-    exit 1
+
+verify_icon_representation() {
+    local filename="$1"
+    local expected_pixels="$2"
+    local path="$ICONSET_DIR/CodexWatch.iconset/$filename"
+    [[ -f "$path" ]] || {
+        echo "error: app icon is missing $filename" >&2
+        exit 1
+    }
+    local width
+    local height
+    width="$(sips -g pixelWidth "$path" | awk '/pixelWidth/ { print $2 }')"
+    height="$(sips -g pixelHeight "$path" | awk '/pixelHeight/ { print $2 }')"
+    [[ "$width" == "$expected_pixels" && "$height" == "$expected_pixels" ]] || {
+        echo "error: $filename must be ${expected_pixels}x${expected_pixels}, got ${width}x${height}" >&2
+        exit 1
+    }
 }
+
+verify_icon_representation icon_16x16.png 16
+verify_icon_representation icon_16x16@2x.png 32
+verify_icon_representation icon_32x32.png 32
+verify_icon_representation icon_32x32@2x.png 64
+verify_icon_representation icon_128x128.png 128
+verify_icon_representation icon_128x128@2x.png 256
+verify_icon_representation icon_256x256.png 256
+verify_icon_representation icon_256x256@2x.png 512
+verify_icon_representation icon_512x512.png 512
+verify_icon_representation icon_512x512@2x.png 1024
 
 DISPLAY_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$INFO_PLIST")"
 BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO_PLIST")"

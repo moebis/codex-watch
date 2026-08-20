@@ -1,15 +1,16 @@
 # Codex Watch
 
-Codex Watch is a native macOS menu bar app for monitoring ChatGPT Codex quota, token usage, and activity. Version 1.1 adds a private, on-demand analytics dashboard while keeping the menu-bar percentage focused on the base weekly quota.
+Codex Watch is a native macOS menu bar app for monitoring ChatGPT Codex quota, token usage, and activity. Version 1.2 adds exact first-party lifetime profile statistics, a more visible status mark, and a shorter Codex-focused menu while keeping the menu-bar percentage focused on the base weekly quota.
 
 ## What it shows
 
 - The rounded percentage remaining in the base weekly Codex quota, always visible in the menu bar.
-- Every valid base, model-specific, and code-review quota window returned by ChatGPT, including remaining percentage, reset countdown, and progress.
+- Every valid base and code-review quota window returned by ChatGPT, including remaining percentage, reset countdown, and progress. Codex Spark limits remain decoded but are intentionally hidden from the compact menu.
 - Deterministic quota pace (`On pace`, `in reserve`, or `in deficit`) once at least 3% of a server-provided window has elapsed. Pace is a linear snapshot, not a probability or entitlement estimate.
 - The recognized ChatGPT plan, credits balance or `Unlimited`, available reset-credit count, and the earliest supported reset-credit expiry when present.
 - A compact 30-day menu summary for total, uncached-input, cached-input, and output tokens plus turns, chats, token coverage, and server data-through date.
-- A reusable native dashboard with 7-, 30-, 90-, and 365-day ranges, summary cards, an Apple Charts token chart, an accessible activity heatmap, model activity, and client token totals.
+- A reusable native dashboard whose Usage tab provides 7-, 30-, 90-, and 365-day ranges, summary cards, an Apple Charts token chart, an accessible activity heatmap, model activity, and client token totals.
+- A Lifetime tab with exact server-reported lifetime tokens, peak daily tokens, longest chat, current and longest streaks, daily token activity, activity insights, and most-used Codex plugins or skills.
 
 Model rows report turns, chats, credits, and turn share because the endpoint does not provide per-model token counts. Client rows report server-provided token fields. Dates with activity but no historical token fields are labeled `Activity only`; they are not treated as zero-token or missing days. Period comparisons appear only when both periods have at least 90% token coverage, and the 365-day range does not claim a comparison.
 
@@ -24,9 +25,9 @@ The menu includes:
 - `Open ChatGPT`
 - Quit
 
-Adaptive refresh is the default for a fresh preference domain. It checks every 2 minutes after recent menu interaction, then backs off to 5, 15, or 30 minutes. Low Power Mode and serious or critical thermal pressure use 30 minutes. Opening the menu requests fresh quota only when the last successful snapshot is older than 60 seconds. Analytics is fetched on manual refresh and no more than once every 15 minutes automatically.
+Adaptive refresh is the default for a fresh preference domain. It checks every 2 minutes after recent menu interaction, then backs off to 5, 15, or 30 minutes. Low Power Mode and serious or critical thermal pressure use 30 minutes. Opening the menu requests fresh quota only when the last successful snapshot is older than 60 seconds. Bounded Usage analytics and Lifetime profile statistics are fetched on manual refresh and no more than once every 15 minutes automatically.
 
-Automatic triggers share active work. A manual refresh replaces older background work, and stale generations cannot publish. Quota errors preserve and dim the last successful percentage with an `Updated … ago` label; analytics errors preserve the last successful in-memory dataset and mark it stale.
+Automatic triggers share active work. A manual refresh replaces older background work, and stale generations cannot publish. Quota errors preserve and dim the last successful percentage with an `Updated … ago` label. Usage and Lifetime failures are independent: each preserves its own last successful in-memory result and marks only that dashboard surface stale.
 
 ## CSV export
 
@@ -42,13 +43,14 @@ Credentials are used in memory only for read-only requests on the original ChatG
 GET https://chatgpt.com/backend-api/wham/usage
 GET https://chatgpt.com/backend-api/wham/rate-limit-reset-credits
 GET https://chatgpt.com/backend-api/wham/analytics/daily-workspace-usage-counts
+GET https://chatgpt.com/backend-api/wham/profiles/me
 ```
 
-The analytics request covers the inclusive trailing 365 calendar days. Smaller views are projected locally from that one bounded response. Each response is capped at one mebibyte. The production network session is ephemeral, uncached, cookieless, and rejects redirects to another host.
+The Usage analytics request covers the inclusive trailing 365 calendar days. Smaller views are projected locally from that one bounded response. The profile request supplies exact Lifetime headline totals and its own daily activity buckets; those values are never reconstructed from incomplete historical rows. Each response is capped at one mebibyte. The production network session is ephemeral, uncached, cookieless, and rejects redirects to another host.
 
 Authenticated responses remain in process memory. Codex Watch never logs credentials, headers, response bodies, account identifiers, analytics values, or export paths. It does not read rollout JSONL, the Codex task database, prompts, titles, project paths, browser cookies, Keychain browser material, or process lists. It adds no telemetry, updater, automatic download, hidden web view, or third-party network destination.
 
-The ChatGPT routes are internal and may change without notice. Missing or changed optional fields are hidden or marked partial rather than guessed. Codex Watch does not infer absolute token allowances, lifetime totals, streaks, plugin use, skill use, reasoning modes, or pricing.
+The ChatGPT routes are internal and may change without notice. Missing or changed optional fields are hidden or marked partial rather than guessed. Codex Watch does not infer absolute token allowances, missing lifetime totals, streaks, plugin use, skill use, reasoning modes, or pricing.
 
 ## Install
 
@@ -83,4 +85,4 @@ A `vMAJOR.MINOR.PATCH` tag matching `CFBundleShortVersionString` triggers the Gi
 
 MIT License. See [LICENSE](LICENSE).
 
-Codex Watch is derived from [CodexNotch by smallyunet](https://github.com/smallyunet/codex-notch). The original copyright and license notice are preserved. The 1.1 Codex-only analytics architecture also drew practical inspiration from [CodexBar](https://github.com/steipete/CodexBar/) while intentionally excluding its multi-provider, browser-cookie, and updater surface.
+Codex Watch is derived from [CodexNotch by smallyunet](https://github.com/smallyunet/codex-notch). The original copyright and license notice are preserved. The Codex-only analytics architecture also drew practical inspiration from [CodexBar](https://github.com/steipete/CodexBar/) while intentionally excluding its multi-provider, browser-cookie, and updater surface.
