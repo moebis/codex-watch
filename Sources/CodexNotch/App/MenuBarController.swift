@@ -22,24 +22,19 @@ final class MenuBarController: NSObject {
     private let statusItem: NSStatusItem
     private let authReader: CodexAuthReader
     private let session: URLSession
-    private let updateService: UpdateService
     private var refreshTimer: Timer?
     private var refreshTask: Task<Void, Never>?
-    private var updateTask: Task<Void, Never>?
     private var snapshot: UsageSnapshot?
     private var errorState: MenuBarErrorState?
-    private var updateState = UpdateState.idle
 
     init(
         statusItem: NSStatusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength),
         authReader: CodexAuthReader = CodexAuthReader(),
-        session: URLSession = SecureUsageSession.make(),
-        updateService: UpdateService = UpdateService()
+        session: URLSession = SecureUsageSession.make()
     ) {
         self.statusItem = statusItem
         self.authReader = authReader
         self.session = session
-        self.updateService = updateService
         super.init()
     }
 
@@ -60,8 +55,6 @@ final class MenuBarController: NSObject {
         refreshTimer = nil
         refreshTask?.cancel()
         refreshTask = nil
-        updateTask?.cancel()
-        updateTask = nil
         session.invalidateAndCancel()
         NSStatusBar.system.removeStatusItem(statusItem)
     }
@@ -139,63 +132,9 @@ final class MenuBarController: NSObject {
         let versionItem = NSMenuItem(title: "Version \(AppIdentity.version)", action: nil, keyEquivalent: "")
         versionItem.isEnabled = false
         menu.addItem(versionItem)
-        addUpdateItems(to: menu)
         menu.addItem(.separator())
         menu.addItem(actionItem(title: "Quit CodexNotch", action: #selector(quit), keyEquivalent: "q"))
         statusItem.menu = menu
-    }
-
-    private func addUpdateItems(to menu: NSMenu) {
-        switch updateState {
-        case .idle:
-            menu.addItem(actionItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: ""))
-        case .checking:
-            let item = NSMenuItem(title: "Checking for Updates…", action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            menu.addItem(item)
-        case .upToDate:
-            let item = NSMenuItem(title: "You’re Up to Date", action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            menu.addItem(item)
-            menu.addItem(actionItem(title: "Check Again", action: #selector(checkForUpdates), keyEquivalent: ""))
-        case let .available(release):
-            menu.addItem(actionItem(title: "View \(release.tagName) Release…", action: #selector(openAvailableRelease), keyEquivalent: ""))
-        case .failed:
-            let item = NSMenuItem(title: "Couldn’t Check for Updates", action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            menu.addItem(item)
-            menu.addItem(actionItem(title: "Try Again", action: #selector(checkForUpdates), keyEquivalent: ""))
-        }
-    }
-
-    @objc private func checkForUpdates() {
-        updateTask?.cancel()
-        updateState = .checking
-        rebuildMenu()
-        let service = updateService
-        updateTask = Task { [weak self] in
-            do {
-                let release = try await service.latestRelease()
-                guard !Task.isCancelled else { return }
-                await MainActor.run { [weak self] in
-                    self?.updateState = UpdateService.isNewer(release.tagName, than: AppIdentity.version)
-                        ? .available(release)
-                        : .upToDate
-                    self?.rebuildMenu()
-                }
-            } catch {
-                guard !Task.isCancelled else { return }
-                await MainActor.run { [weak self] in
-                    self?.updateState = .failed
-                    self?.rebuildMenu()
-                }
-            }
-        }
-    }
-
-    @objc private func openAvailableRelease() {
-        guard case let .available(release) = updateState else { return }
-        NSWorkspace.shared.open(release.htmlURL)
     }
 
     private func actionItem(title: String, action: Selector, keyEquivalent: String) -> NSMenuItem {
@@ -214,14 +153,6 @@ final class MenuBarController: NSObject {
     @objc private func quit() {
         NSApp.terminate(nil)
     }
-}
-
-enum UpdateState: Equatable {
-    case idle
-    case checking
-    case upToDate
-    case available(GitHubRelease)
-    case failed
 }
 
 enum MenuBarErrorState: Equatable {

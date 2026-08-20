@@ -200,6 +200,33 @@ final class CodexUsageClientTests: XCTestCase {
         _ = try await makeClient().fetch()
     }
 
+    func testOversizedUsageResponseIsRejectedBeforeDecoding() async throws {
+        let oversizedResponse = Data(repeating: 0x20, count: 1_048_577)
+        MockURLProtocol.requestHandler = { request in
+            (self.response(status: 200, url: request.url), oversizedResponse)
+        }
+
+        do {
+            _ = try await makeClient().fetch()
+            XCTFail("Expected an oversized response error")
+        } catch let error as URLError {
+            XCTAssertEqual(error.code, .dataLengthExceedsMaximum)
+        } catch {
+            XCTFail("Expected an oversized response error, got \(error)")
+        }
+    }
+
+    func testExtremeResetTimestampIsDiscarded() throws {
+        let snapshot = try JSONDecoder().decode(
+            UsageResponseDTO.self,
+            from: Data(
+                #"{"secondary_window":{"used_percent":5,"limit_window_seconds":604800,"reset_at":1e300}}"#.utf8
+            )
+        ).snapshot()
+
+        XCTAssertNil(snapshot.weeklyWindow?.resetAt)
+    }
+
     func testUnauthorizedResponseRequiresReauthentication() async throws {
         MockURLProtocol.requestHandler = { _ in
             (self.response(status: 401), Data())

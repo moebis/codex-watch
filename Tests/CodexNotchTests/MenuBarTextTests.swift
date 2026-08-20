@@ -4,6 +4,24 @@ import XCTest
 @testable import CodexNotch
 
 final class MenuBarTextTests: XCTestCase {
+    func testMenuDoesNotOfferRepositoryUpdateChecks() {
+        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let controller = MenuBarController(
+            statusItem: statusItem,
+            authReader: CodexAuthReader(
+                environment: [:],
+                homeDirectory: URL(fileURLWithPath: "/definitely/not/the-test-home")
+            ),
+            session: URLSession(configuration: .ephemeral)
+        )
+        controller.start()
+        defer { controller.stop() }
+
+        let menuTitles = statusItem.menu?.items.map(\.title) ?? []
+
+        XCTAssertFalse(menuTitles.contains { $0.localizedCaseInsensitiveContains("update") })
+    }
+
     func testStatusButtonUsesCompactNativeImageAndTitleLayout() {
         let button = NSButton(frame: .zero)
 

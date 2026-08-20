@@ -168,7 +168,12 @@ struct WindowDTO: Decodable {
 
         if let epoch = try? container.decode(Double.self, forKey: .resetAt) {
             let seconds = epoch > 1_000_000_000_000 ? epoch / 1_000 : epoch
-            resetAt = Date(timeIntervalSince1970: seconds)
+            if seconds.isFinite,
+               (0 ... Date.distantFuture.timeIntervalSince1970).contains(seconds) {
+                resetAt = Date(timeIntervalSince1970: seconds)
+            } else {
+                resetAt = nil
+            }
         } else if let text = try? container.decode(String.self, forKey: .resetAt) {
             resetAt = Self.parseISO8601Date(text)
         } else {

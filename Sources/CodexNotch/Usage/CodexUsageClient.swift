@@ -44,6 +44,7 @@ private final class SameHostHTTPSRedirectDelegate: NSObject, URLSessionTaskDeleg
 struct CodexUsageClient {
     static let defaultEndpoint = URL(string: "https://chatgpt.com/backend-api/wham/usage")!
     static let resetCreditsPath = "/backend-api/wham/rate-limit-reset-credits"
+    static let maximumResponseSize = 1_048_576
 
     let credentials: CodexCredentials
     let session: URLSession
@@ -110,7 +111,7 @@ struct CodexUsageClient {
         if let accountID = credentials.accountID, !accountID.isEmpty {
             request.setValue(accountID, forHTTPHeaderField: "ChatGPT-Account-Id")
         }
-        let (data, response) = try await session.data(for: request)
+        let (bytes, response) = try await session.bytes(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw CodexUsageError.invalidHTTPResponse
         }
@@ -121,6 +122,20 @@ struct CodexUsageClient {
             throw CodexUsageError.httpStatus(httpResponse.statusCode)
         }
 
+        if response.expectedContentLength > Self.maximumResponseSize {
+            throw URLError(.dataLengthExceedsMaximum)
+        }
+
+        var data = Data()
+        if response.expectedContentLength > 0 {
+            data.reserveCapacity(min(Int(response.expectedContentLength), Self.maximumResponseSize))
+        }
+        for try await byte in bytes {
+            guard data.count < Self.maximumResponseSize else {
+                throw URLError(.dataLengthExceedsMaximum)
+            }
+            data.append(byte)
+        }
         return data
     }
 }

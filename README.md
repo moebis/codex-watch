@@ -10,7 +10,7 @@ CodexNotch is a small, native macOS menu bar app that shows your remaining weekl
 - Visualizes the remaining weekly quota and time until weekly reset with two progress bars.
 - Shows available rate-limit reset credits and visualizes time remaining until the next expiry when ChatGPT provides exact grant and expiry metadata.
 - Refreshes automatically every 60 seconds and supports manual refresh.
-- Shows the installed version and checks GitHub for a newer release when requested.
+- Shows the installed version in the menu.
 - Opens the installed ChatGPT/Codex app from the menu.
 - Uses no telemetry, analytics, automatic updater, browser view, or third-party package.
 
@@ -24,7 +24,12 @@ CodexNotch does not create a notch overlay, inspect conversation logs, read prom
 
 ## Install
 
-Download the latest universal macOS ZIP from [GitHub Releases](https://github.com/smallyunet/codex-notch/releases/latest), unzip it, and move `CodexNotch.app` to Applications.
+Build the app locally, verify it, and move the resulting `CodexNotch.app` to Applications:
+
+```sh
+./scripts/verify.sh /private/tmp/codex-notch-build
+ditto /private/tmp/codex-notch-build/CodexNotch.app /Applications/CodexNotch.app
+```
 
 The automated release is ad-hoc signed because this repository does not currently have an Apple Developer ID certificate. macOS may require Control-clicking the app and choosing **Open** on first launch.
 
@@ -43,7 +48,7 @@ The network session is ephemeral, has no response cache or cookie store, and rej
 The endpoint is an internal ChatGPT endpoint and may change without notice.
 If the endpoint omits or changes its plan identifier, the app shows the plan as unavailable rather than guessing. CodexNotch does not infer an absolute token allowance from quota percentages.
 
-Update checks are manual. They use a separate ephemeral, unauthenticated request to the fixed CodexNotch repository endpoint on `api.github.com`; the app does not download or install releases automatically.
+Each ChatGPT response is limited to one mebibyte before decoding. The app makes no update-check request and never downloads or installs releases.
 
 ## Build and test
 
