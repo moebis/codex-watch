@@ -2,7 +2,7 @@
 
 ## Product boundary
 
-Codex Watch is a standalone native macOS menu bar app with one user-opened native analytics window. It displays the remaining weekly ChatGPT Codex quota as a high-contrast monitoring icon plus percentage, hides Codex Spark limits from the compact menu, projects one bounded 365-day analytics response into 7/30/90/365-day views, and presents exact server-reported lifetime profile statistics in a separate dashboard tab. It does not render a notch overlay or inspect Codex session or rollout logs.
+Codex Watch is a standalone native macOS menu bar app with one user-opened native analytics window. It displays the remaining weekly ChatGPT Codex quota as a native adaptive pie-chart icon plus percentage, hides Codex Spark limits from the compact menu, projects one bounded 365-day analytics response into 7/30/90/365-day views, and presents exact server-reported lifetime profile statistics in the compact menu and a separate dashboard tab. It does not render a notch overlay or inspect Codex session or rollout logs.
 
 ## Required change harness
 

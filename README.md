@@ -1,6 +1,6 @@
 # Codex Watch
 
-Codex Watch is a native macOS menu bar app for monitoring ChatGPT Codex quota, token usage, and activity. Version 1.2 adds exact first-party lifetime profile statistics, a more visible status mark, and a shorter Codex-focused menu while keeping the menu-bar percentage focused on the base weekly quota.
+Codex Watch is a native macOS menu bar app for monitoring ChatGPT Codex quota, token usage, and activity. Version 1.2 adds exact first-party lifetime profile statistics, a native adaptive pie-chart status item, and a shorter Codex-focused menu while keeping the menu-bar percentage focused on the base weekly quota.
 
 ## What it shows
 
@@ -8,7 +8,7 @@ Codex Watch is a native macOS menu bar app for monitoring ChatGPT Codex quota, t
 - Every valid base and code-review quota window returned by ChatGPT, including remaining percentage, reset countdown, and progress. Codex Spark limits remain decoded but are intentionally hidden from the compact menu.
 - Deterministic quota pace (`On pace`, `in reserve`, or `in deficit`) once at least 3% of a server-provided window has elapsed. Pace is a linear snapshot, not a probability or entitlement estimate.
 - The recognized ChatGPT plan, credits balance or `Unlimited`, available reset-credit count, and the earliest supported reset-credit expiry when present.
-- A compact 30-day menu summary for total, uncached-input, cached-input, and output tokens plus turns, chats, token coverage, and server data-through date.
+- A persistent `30 Days` / `Lifetime` selector in the compact menu. The 30-day summary shows total, uncached-input, cached-input, and output tokens plus turns, chats, token coverage, and server data-through date; Lifetime shows exact first-party headline totals, peak daily tokens, longest chat, streaks, and data-through date.
 - A reusable native dashboard whose Usage tab provides 7-, 30-, 90-, and 365-day ranges, summary cards, an Apple Charts token chart, an accessible activity heatmap, model activity, and client token totals.
 - A Lifetime tab with exact server-reported lifetime tokens, peak daily tokens, longest chat, current and longest streaks, returned daily token activity, activity insights, and the 50 most-used Codex plugins or skills.
 

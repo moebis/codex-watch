@@ -6,24 +6,29 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
     private let authReader: CodexAuthReader
     private let session: URLSession
+    private let defaults: UserDefaults
     private let persistRefreshFrequency: (RefreshFrequency) -> Void
     private var coordinator: RefreshCoordinator!
     private var snapshot: UsageSnapshot?
     private var errorState: MenuBarErrorState?
     private(set) var analyticsStale = false
     private(set) var profileStale = false
+    private var menuAnalyticsSection: MenuAnalyticsSection
     private var analyticsWindowController: AnalyticsWindowController?
 
     init(
         statusItem: NSStatusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength),
         authReader: CodexAuthReader = CodexAuthReader(),
         session: URLSession = SecureUsageSession.make(),
+        defaults: UserDefaults = .standard,
         refreshFrequency: RefreshFrequency = .adaptive,
         persistRefreshFrequency: @escaping (RefreshFrequency) -> Void = { _ in }
     ) {
         self.statusItem = statusItem
         self.authReader = authReader
         self.session = session
+        self.defaults = defaults
+        menuAnalyticsSection = MenuAnalyticsSection.load(from: defaults)
         self.persistRefreshFrequency = persistRefreshFrequency
         super.init()
         coordinator = RefreshCoordinator(
@@ -126,7 +131,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
-    private func apply(result: RefreshResult) {
+    func apply(result: RefreshResult) {
         analyticsStale = result.analyticsStale
         profileStale = result.profileStale
         if let value = result.snapshot {
@@ -181,8 +186,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         guard let button = statusItem.button else { return }
         button.title = MenuBarText.statusTitle(snapshot: snapshot)
         let isStale = errorState != nil && snapshot != nil
-        button.alphaValue = isStale ? 0.62 : 1
-        button.contentTintColor = isStale ? .secondaryLabelColor : .labelColor
+        MenuBarButtonStyle.applyRefreshState(to: button, isStale: isStale)
     }
 
     private func rebuildMenu() {
@@ -198,19 +202,37 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         )
         menu.addItem(progressItem)
 
-        if let dataset = snapshot?.analyticsDataset,
-           let projection = UsageAnalyticsProjection.make(
-               dataset: dataset,
-               range: .days30,
-               referenceDate: .now
-           ) {
-            menu.addItem(.separator())
-            let analyticsItem = NSMenuItem()
-            analyticsItem.view = UsageAnalyticsMenuView(
-                presentation: UsageAnalyticsPresentation(
+        let usagePresentation = snapshot?.analyticsDataset.flatMap { dataset in
+            UsageAnalyticsProjection.make(
+                dataset: dataset,
+                range: .days30,
+                referenceDate: .now
+            ).map { projection in
+                UsageAnalyticsPresentation(
                     projection: projection,
                     isStale: analyticsStale
                 )
+            }
+        }
+        let lifetimePresentation = snapshot?.profileStats.map { profile in
+            LifetimeAnalyticsPresentation(
+                model: LifetimeDashboardModel(profile: profile),
+                isStale: profileStale
+            )
+        }
+
+        if usagePresentation != nil || lifetimePresentation != nil {
+            menu.addItem(.separator())
+            let analyticsItem = NSMenuItem()
+            analyticsItem.view = UsageAnalyticsMenuView(
+                usagePresentation: usagePresentation,
+                lifetimePresentation: lifetimePresentation,
+                selectedSection: menuAnalyticsSection,
+                onSelect: { [weak self] section in
+                    guard let self else { return }
+                    menuAnalyticsSection = section
+                    section.persist(to: defaults)
+                }
             )
             menu.addItem(analyticsItem)
         }

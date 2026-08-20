@@ -98,6 +98,53 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertFalse(presentation.dataThrough.isEmpty)
     }
 
+    func testMenuAnalyticsSectionDefaultsToThirtyDaysAndPersistsLifetime() {
+        let suiteName = "CodexWatchTests.MenuAnalyticsSection.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        XCTAssertEqual(MenuAnalyticsSection.load(from: defaults), .days30)
+
+        MenuAnalyticsSection.lifetime.persist(to: defaults)
+
+        XCTAssertEqual(MenuAnalyticsSection.load(from: defaults), .lifetime)
+    }
+
+    func testLifetimeMenuPresentationUsesExactProfileHeadlineMetrics() {
+        let profile = CodexProfileStats(
+            lifetimeTokens: 30_300_000_000,
+            peakDailyTokens: 1_100_000_000,
+            longestRunningTurnSeconds: 56_580,
+            currentStreakDays: 42,
+            longestStreakDays: 82,
+            dailyBuckets: [],
+            insights: CodexProfileInsights(
+                fastModePercent: nil,
+                reasoningEffort: nil,
+                reasoningEffortPercent: nil,
+                uniqueSkillsUsed: nil,
+                totalSkillsUsed: nil,
+                totalChats: nil
+            ),
+            invocations: [],
+            fetchedAt: Date(timeIntervalSince1970: 1_776_326_400)
+        )
+
+        let presentation = LifetimeAnalyticsPresentation(
+            model: LifetimeDashboardModel(profile: profile),
+            isStale: true
+        )
+
+        XCTAssertEqual(presentation.title, "Lifetime")
+        XCTAssertEqual(presentation.lifetimeTokens, "30.3B")
+        XCTAssertEqual(presentation.peakTokens, "1.1B")
+        XCTAssertEqual(presentation.longestChat, "15h 43m")
+        XCTAssertEqual(presentation.currentStreak, "42 days")
+        XCTAssertEqual(presentation.longestStreak, "82 days")
+        XCTAssertFalse(presentation.dataThrough.isEmpty)
+        XCTAssertEqual(presentation.staleValue, "Stale · refresh unavailable")
+    }
+
     func testUsageAnalyticsMenuLabelsPreservedAnalyticsAsStale() {
         let presentation = UsageAnalyticsPresentation(
             projection: makeAnalyticsProjection(
@@ -147,7 +194,93 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertEqual(view.frame.width, UsageAnalyticsMenuView.width)
     }
 
-    func testStatusButtonUsesCompactNativeImageAndTitleLayout() {
+    func testMenuAnalyticsSelectorSwitchesBetweenThirtyDaysAndLifetimeWithoutClosing() throws {
+        var selectedSection: MenuAnalyticsSection?
+        let view = UsageAnalyticsMenuView(
+            usagePresentation: UsageAnalyticsPresentation(
+                projection: makeAnalyticsProjection(
+                    totalTokens: 12_600_000_000,
+                    inputTokens: 559_000_000,
+                    cachedInputTokens: 12_000_000_000,
+                    outputTokens: 41_800_000,
+                    turns: 3_400,
+                    chats: 1_300
+                )
+            ),
+            lifetimePresentation: makeLifetimePresentation(),
+            selectedSection: .days30,
+            onSelect: { selectedSection = $0 }
+        )
+        let selector = try XCTUnwrap(segmentedControls(in: view).first)
+
+        XCTAssertEqual(selector.segmentCount, 2)
+        XCTAssertEqual(selector.label(forSegment: 0), "30 Days")
+        XCTAssertEqual(selector.label(forSegment: 1), "Lifetime")
+        XCTAssertEqual(selector.selectedSegment, 0)
+        XCTAssertTrue(visibleTextValues(in: view).contains("Input tokens"))
+        XCTAssertFalse(visibleTextValues(in: view).contains("Lifetime tokens"))
+
+        selector.selectedSegment = 1
+        selector.sendAction(selector.action, to: selector.target)
+
+        XCTAssertEqual(selectedSection, .lifetime)
+        XCTAssertTrue(visibleTextValues(in: view).contains("Lifetime tokens"))
+        XCTAssertTrue(visibleTextValues(in: view).contains("30.3B"))
+        XCTAssertFalse(visibleTextValues(in: view).contains("Input tokens"))
+    }
+
+    func testMenuControllerRestoresAndPersistsTheAnalyticsSelector() throws {
+        let suiteName = "CodexWatchTests.MenuControllerSection.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        MenuAnalyticsSection.lifetime.persist(to: defaults)
+        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let controller = MenuBarController(
+            statusItem: statusItem,
+            authReader: CodexAuthReader(
+                environment: [:],
+                homeDirectory: URL(fileURLWithPath: "/definitely/not/the-test-home")
+            ),
+            session: URLSession(configuration: .ephemeral),
+            defaults: defaults
+        )
+        defer { controller.stop() }
+
+        controller.apply(result: RefreshResult(
+            snapshot: UsageSnapshot(
+                windows: [],
+                analyticsDataset: makeAnalyticsDataset(
+                    totalTokens: 12_600_000_000,
+                    inputTokens: 559_000_000,
+                    cachedInputTokens: 12_000_000_000,
+                    outputTokens: 41_800_000,
+                    turns: 3_400,
+                    chats: 1_300
+                ),
+                profileStats: makeLifetimeProfile()
+            ),
+            error: nil,
+            analyticsStale: false,
+            profileStale: false
+        ))
+
+        let view = try XCTUnwrap(
+            statusItem.menu?.items.compactMap { $0.view as? UsageAnalyticsMenuView }.first
+        )
+        let selector = try XCTUnwrap(segmentedControls(in: view).first)
+        XCTAssertEqual(selector.label(forSegment: 0), "30 Days")
+        XCTAssertEqual(selector.label(forSegment: 1), "Lifetime")
+        XCTAssertEqual(selector.selectedSegment, 1)
+        XCTAssertTrue(visibleTextValues(in: view).contains("Lifetime tokens"))
+
+        selector.selectedSegment = 0
+        selector.sendAction(selector.action, to: selector.target)
+
+        XCTAssertEqual(MenuAnalyticsSection.load(from: defaults), .days30)
+        XCTAssertTrue(visibleTextValues(in: view).contains("Input tokens"))
+    }
+
+    func testStatusButtonUsesAdaptivePieTemplateAndCompactTitleLayout() {
         let button = NSButton(frame: .zero)
 
         MenuBarButtonStyle.apply(to: button)
@@ -159,9 +292,26 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertEqual(button.alignment, .center)
         XCTAssertEqual(button.font?.pointSize, MenuBarButtonStyle.fontSize)
         XCTAssertEqual(image?.size, NSSize(width: 16, height: 16))
-        XCTAssertFalse(image?.isTemplate ?? true)
-        XCTAssertEqual(image?.accessibilityDescription, "Codex Watch quota monitor")
+        XCTAssertTrue(image?.isTemplate ?? false)
+        XCTAssertEqual(image?.accessibilityDescription, "Codex Watch usage statistics")
         XCTAssertNotNil(image?.tiffRepresentation)
+    }
+
+    func testStatusButtonLetsMacOSChooseAdaptiveIconAndPercentageColor() {
+        let button = NSButton(frame: .zero)
+        button.title = "89%"
+        MenuBarButtonStyle.apply(to: button)
+
+        MenuBarButtonStyle.applyRefreshState(to: button, isStale: false)
+
+        XCTAssertNil(button.contentTintColor)
+        XCTAssertEqual(button.alphaValue, 1)
+
+        MenuBarButtonStyle.applyRefreshState(to: button, isStale: true)
+
+        XCTAssertNil(button.contentTintColor)
+        XCTAssertEqual(button.alphaValue, 0.62, accuracy: 0.001)
+        XCTAssertEqual(button.title, "89%")
     }
 
     func testStatusTitleShowsRoundedWeeklyRemainingPercent() {
@@ -612,6 +762,46 @@ final class MenuBarTextTests: XCTestCase {
         }
     }
 
+    private func segmentedControls(in view: NSView) -> [NSSegmentedControl] {
+        view.subviews.flatMap { child in
+            (child as? NSSegmentedControl).map { [$0] } ?? segmentedControls(in: child)
+        }
+    }
+
+    private func visibleTextValues(in view: NSView) -> [String] {
+        guard !view.isHidden else { return [] }
+        return view.subviews.flatMap { child in
+            (child as? NSTextField).map { [$0.stringValue] } ?? visibleTextValues(in: child)
+        }
+    }
+
+    private func makeLifetimePresentation() -> LifetimeAnalyticsPresentation {
+        LifetimeAnalyticsPresentation(
+            model: LifetimeDashboardModel(profile: makeLifetimeProfile())
+        )
+    }
+
+    private func makeLifetimeProfile() -> CodexProfileStats {
+        CodexProfileStats(
+            lifetimeTokens: 30_300_000_000,
+            peakDailyTokens: 1_100_000_000,
+            longestRunningTurnSeconds: 56_580,
+            currentStreakDays: 42,
+            longestStreakDays: 82,
+            dailyBuckets: [],
+            insights: CodexProfileInsights(
+                fastModePercent: nil,
+                reasoningEffort: nil,
+                reasoningEffortPercent: nil,
+                uniqueSkillsUsed: nil,
+                totalSkillsUsed: nil,
+                totalChats: nil
+            ),
+            invocations: [],
+            fetchedAt: Date(timeIntervalSince1970: 1_776_326_400)
+        )
+    }
+
     private func makeAnalyticsProjection(
         totalTokens: Int64,
         inputTokens: Int64,
@@ -620,6 +810,32 @@ final class MenuBarTextTests: XCTestCase {
         turns: Int64,
         chats: Int64
     ) -> UsageAnalyticsProjection {
+        let dataset = makeAnalyticsDataset(
+            totalTokens: totalTokens,
+            inputTokens: inputTokens,
+            cachedInputTokens: cachedInputTokens,
+            outputTokens: outputTokens,
+            turns: turns,
+            chats: chats
+        )
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return UsageAnalyticsProjection.make(
+            dataset: dataset,
+            range: .days30,
+            referenceDate: dataset.requestedEnd,
+            calendar: calendar
+        )!
+    }
+
+    private func makeAnalyticsDataset(
+        totalTokens: Int64,
+        inputTokens: Int64,
+        cachedInputTokens: Int64,
+        outputTokens: Int64,
+        turns: Int64,
+        chats: Int64
+    ) -> UsageAnalyticsDataset {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let end = calendar.date(from: DateComponents(year: 2026, month: 8, day: 20))!
@@ -637,7 +853,7 @@ final class MenuBarTextTests: XCTestCase {
             models: [],
             clients: []
         )
-        let dataset = UsageAnalyticsDataset(
+        return UsageAnalyticsDataset(
             requestedStart: start,
             requestedEnd: end,
             days: [day],
@@ -645,12 +861,6 @@ final class MenuBarTextTests: XCTestCase {
             modelBreakdownIsPartial: false,
             clientBreakdownIsPartial: false
         )
-        return UsageAnalyticsProjection.make(
-            dataset: dataset,
-            range: .days30,
-            referenceDate: end,
-            calendar: calendar
-        )!
     }
 
     private func textValues(in view: NSView) -> [String] {

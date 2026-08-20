@@ -14,50 +14,22 @@ enum MenuBarButtonStyle {
         button.toolTip = "Codex Watch weekly quota"
     }
 
+    static func applyRefreshState(to button: NSButton, isStale: Bool) {
+        button.contentTintColor = nil
+        button.alphaValue = isStale ? 0.62 : 1
+    }
+
     static func makeStatusImage() -> NSImage {
-        let image = NSImage(size: imageSize, flipped: false) { rect in
-            let bounds = rect.insetBy(dx: 0.75, dy: 0.75)
-
-            let background = NSBezierPath(ovalIn: bounds)
-            NSColor(calibratedRed: 0.035, green: 0.075, blue: 0.12, alpha: 0.98).setFill()
-            background.fill()
-            NSColor(calibratedWhite: 1, alpha: 0.72).setStroke()
-            background.lineWidth = 0.75
-            background.stroke()
-
-            let arc = NSBezierPath()
-            arc.appendArc(
-                withCenter: NSPoint(x: rect.midX, y: rect.midY),
-                radius: 5.35,
-                startAngle: 42,
-                endAngle: 313,
-                clockwise: false
-            )
-            arc.lineWidth = 2.05
-            arc.lineCapStyle = .round
-            NSColor(calibratedRed: 0, green: 0.82, blue: 0.95, alpha: 1).setStroke()
-            arc.stroke()
-
-            let chevron = NSBezierPath()
-            chevron.move(to: NSPoint(x: 5.1, y: 9.9))
-            chevron.line(to: NSPoint(x: 7.65, y: 7.7))
-            chevron.line(to: NSPoint(x: 5.1, y: 5.5))
-            chevron.lineWidth = 1.45
-            chevron.lineCapStyle = .round
-            chevron.lineJoinStyle = .round
-            NSColor.white.setStroke()
-            chevron.stroke()
-
-            let cursor = NSBezierPath()
-            cursor.move(to: NSPoint(x: 8.5, y: 5.55))
-            cursor.line(to: NSPoint(x: 11.1, y: 5.55))
-            cursor.lineWidth = 1.35
-            cursor.lineCapStyle = .round
-            cursor.stroke()
-            return true
-        }
-        image.isTemplate = false
-        image.accessibilityDescription = "Codex Watch quota monitor"
+        let description = "Codex Watch usage statistics"
+        let symbol = NSImage(
+            systemSymbolName: "chart.pie.fill",
+            accessibilityDescription: description
+        )
+        let configuration = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+        let image = symbol?.withSymbolConfiguration(configuration) ?? symbol ?? NSImage(size: imageSize)
+        image.size = imageSize
+        image.isTemplate = true
+        image.accessibilityDescription = description
         return image
     }
 }
