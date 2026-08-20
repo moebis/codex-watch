@@ -90,6 +90,33 @@ final class UsageAnalyticsProjectionTests: XCTestCase {
         XCTAssertEqual(projection.days[6].state, .missing)
     }
 
+    func testActivityOnlyDaysRemainDistinctFromTokenZerosAndMissingDates() throws {
+        let activityOnly = UsageAnalyticsDay(
+            date: day("2026-08-18"),
+            totals: totals(total: 0, turns: 5, chats: 2),
+            models: [],
+            clients: [],
+            tokenDataIsAvailable: false
+        )
+        let tokenZero = makeDay("2026-08-19", total: 0, turns: 1, chats: 1)
+
+        let projection = try XCTUnwrap(UsageAnalyticsProjection.make(
+            dataset: makeDataset(observed: [activityOnly, tokenZero]),
+            range: .days7,
+            referenceDate: day("2026-08-20"),
+            calendar: utcCalendar()
+        ))
+
+        XCTAssertEqual(projection.days[4].state, .activityOnly(turns: 5, chats: 2))
+        XCTAssertEqual(projection.days[5].state, .observed(totals(total: 0, turns: 1, chats: 1)))
+        XCTAssertEqual(projection.days[6].state, .missing)
+        XCTAssertEqual(projection.observedDayCount, 1)
+        XCTAssertEqual(projection.activityOnlyDayCount, 1)
+        XCTAssertEqual(projection.missingDayCount, 5)
+        XCTAssertEqual(projection.turns, 6)
+        XCTAssertEqual(projection.chats, 3)
+    }
+
     func testAggregateOverflowRejectsProjection() {
         let dataset = makeDataset(observed: [
             makeDay("2026-08-19", total: .max, turns: 1, chats: 1),

@@ -79,6 +79,27 @@ final class UsageAnalyticsDatasetTests: XCTestCase {
         XCTAssertNil(dataset.dataThrough)
     }
 
+    func testActivityOnlyDailyRowIsPreservedWithoutFabricatingTokenUsage() throws {
+        let response = try JSONDecoder().decode(
+            UsageAnalyticsResponseDTO.self,
+            from: Data(
+                #"{"group_by":"day","data":[{"date":"2026-01-15","totals":{"threads":2,"turns":5,"credits":1.5,"users":1},"models":[],"clients":[]}] }"#.utf8
+            )
+        )
+
+        let dataset = try XCTUnwrap(response.dataset(
+            requestedStart: day("2026-01-01"),
+            requestedEnd: day("2026-08-20"),
+            calendar: utcCalendar()
+        ))
+
+        let activityOnly = try XCTUnwrap(dataset.days.first)
+        XCTAssertFalse(activityOnly.tokenDataIsAvailable)
+        XCTAssertEqual(activityOnly.totals.turns, 5)
+        XCTAssertEqual(activityOnly.totals.chats, 2)
+        XCTAssertEqual(activityOnly.totals.totalTokens, 0)
+    }
+
     func testInvalidOrOutOfRangeDailyTotalsRejectWholeDataset() throws {
         let invalidRows = [
             #"{"date":"2026-07-31","totals":{"threads":1,"turns":1,"uncached_text_input_tokens":1,"cached_text_input_tokens":1,"text_output_tokens":1,"text_total_tokens":3}}"#,

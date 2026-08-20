@@ -1,0 +1,400 @@
+import Charts
+import SwiftUI
+
+struct AnalyticsDashboardView: View {
+    @ObservedObject var model: AnalyticsDashboardModel
+    let onExport: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            header
+
+            Picker("Range", selection: $model.range) {
+                ForEach(AnalyticsRange.allCases) { range in
+                    Text(range.title).tag(range)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityLabel("Analytics range")
+
+            if let projection = model.projection {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        summaryCards(projection)
+                        tokenChart(projection)
+                        activityHeatmap(projection)
+                        modelActivityTable(projection)
+                        clientTokenTable(projection)
+                        footer(projection)
+                    }
+                    .padding(.bottom, 4)
+                }
+            } else {
+                ContentUnavailableView(
+                    "Analytics unavailable",
+                    systemImage: "chart.xyaxis.line",
+                    description: Text("Refresh Codex Watch after signing in to ChatGPT.")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 760, minHeight: 560)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Codex Watch Analytics")
+                    .font(.title2.weight(.semibold))
+                Text("Codex usage reported by ChatGPT")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if model.isStale {
+                Label("Stale data", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(.orange.opacity(0.12), in: Capsule())
+            }
+            Button("Export CSV…", systemImage: "square.and.arrow.up") {
+                onExport()
+            }
+            .disabled(model.projection == nil)
+            .accessibilityHint("Choose where to save the selected analytics range")
+        }
+    }
+
+    private func summaryCards(_ projection: UsageAnalyticsProjection) -> some View {
+        LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4),
+            spacing: 10
+        ) {
+            DashboardMetricCard(
+                title: "Total tokens",
+                value: Self.compact(projection.totalTokens),
+                detail: comparisonText(projection.comparison)
+            )
+            DashboardMetricCard(
+                title: "Input tokens",
+                value: Self.compact(projection.uncachedInputTokens),
+                detail: "Uncached"
+            )
+            DashboardMetricCard(
+                title: "Cached input",
+                value: Self.compact(projection.cachedInputTokens),
+                detail: "Server-reported"
+            )
+            DashboardMetricCard(
+                title: "Output tokens",
+                value: Self.compact(projection.outputTokens),
+                detail: "Generated"
+            )
+            DashboardMetricCard(
+                title: "Turns",
+                value: Self.compact(projection.turns),
+                detail: "Codex activity"
+            )
+            DashboardMetricCard(
+                title: "Chats",
+                value: Self.compact(projection.chats),
+                detail: "Active threads"
+            )
+            DashboardMetricCard(
+                title: "Token coverage",
+                value: "\(projection.observedDayCount)/\(projection.requestedDayCount)",
+                detail: "Observed days"
+            )
+            DashboardMetricCard(
+                title: "Missing",
+                value: String(projection.missingDayCount),
+                detail: projection.activityOnlyDayCount == 0
+                    ? "Shown as gaps"
+                    : "\(projection.activityOnlyDayCount) activity-only"
+            )
+        }
+    }
+
+    private func tokenChart(_ projection: UsageAnalyticsProjection) -> some View {
+        DashboardSection(title: "Daily token usage", subtitle: "Missing dates remain gaps") {
+            Chart {
+                ForEach(projection.days) { day in
+                    if case let .observed(totals) = day.state {
+                        BarMark(
+                            x: .value("Date", day.date, unit: .day),
+                            y: .value("Tokens", totals.totalTokens)
+                        )
+                        .foregroundStyle(Color.accentColor.gradient)
+                        .accessibilityLabel(Self.dayAccessibilityText(day))
+                    }
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading) { value in
+                    AxisGridLine()
+                    AxisValueLabel {
+                        if let tokens = value.as(Int64.self) {
+                            Text(Self.compact(tokens))
+                        }
+                    }
+                }
+            }
+            .chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: projection.range == .days365 ? 12 : 7))
+            }
+            .frame(height: 190)
+            .accessibilityLabel("Daily token usage chart")
+        }
+    }
+
+    private func activityHeatmap(_ projection: UsageAnalyticsProjection) -> some View {
+        let maximum = projection.days.compactMap { day -> Int64? in
+            if case let .observed(totals) = day.state { return totals.totalTokens }
+            return nil
+        }.max() ?? 0
+        let count = projection.range == .days365 ? 53 : min(projection.days.count, 30)
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 3), count: max(1, count))
+
+        return DashboardSection(
+            title: "Token activity",
+            subtitle: "Filled means observed; outlined means missing"
+        ) {
+            LazyVGrid(columns: columns, spacing: 3) {
+                ForEach(projection.days) { day in
+                    UsageHeatmapCell(day: day, maximumTokens: maximum)
+                }
+            }
+        }
+    }
+
+    private func modelActivityTable(_ projection: UsageAnalyticsProjection) -> some View {
+        DashboardSection(
+            title: "Model activity",
+            subtitle: projection.modelBreakdownIsPartial
+                ? "Partial server detail · activity, not token counts"
+                : "Turns, chats, credits, and share · not token counts"
+        ) {
+            DashboardTableHeader(columns: [
+                ("Model", 220), ("Turns", 80), ("Chats", 80),
+                ("Credits", 90), ("Turn share", 90)
+            ])
+            if projection.models.isEmpty {
+                DashboardEmptyRow(text: "No model activity reported")
+            } else {
+                ForEach(projection.models) { row in
+                    HStack(spacing: 12) {
+                        Text(row.model).frame(width: 220, alignment: .leading)
+                        Text(Self.compact(row.turns)).frame(width: 80, alignment: .trailing)
+                        Text(Self.compact(row.chats)).frame(width: 80, alignment: .trailing)
+                        Text(NSDecimalNumber(decimal: row.credits).stringValue)
+                            .frame(width: 90, alignment: .trailing)
+                        Text(Self.percent(row.turnShare)).frame(width: 90, alignment: .trailing)
+                        Spacer(minLength: 0)
+                    }
+                    .font(.system(.body, design: .monospaced))
+                    .lineLimit(1)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+
+    private func clientTokenTable(_ projection: UsageAnalyticsProjection) -> some View {
+        DashboardSection(
+            title: "Client tokens",
+            subtitle: projection.clientBreakdownIsPartial
+                ? "Partial server detail"
+                : "Token totals by Codex client"
+        ) {
+            DashboardTableHeader(columns: [
+                ("Client", 190), ("Total", 90), ("Input", 90), ("Cached", 90),
+                ("Output", 90), ("Turns", 70), ("Chats", 70)
+            ])
+            if projection.clients.isEmpty {
+                DashboardEmptyRow(text: "No client token detail reported")
+            } else {
+                ForEach(projection.clients) { row in
+                    HStack(spacing: 12) {
+                        Text(row.clientID).frame(width: 190, alignment: .leading)
+                        Text(Self.compact(row.totalTokens)).frame(width: 90, alignment: .trailing)
+                        Text(Self.compact(row.uncachedInputTokens)).frame(width: 90, alignment: .trailing)
+                        Text(Self.compact(row.cachedInputTokens)).frame(width: 90, alignment: .trailing)
+                        Text(Self.compact(row.outputTokens)).frame(width: 90, alignment: .trailing)
+                        Text(Self.compact(row.turns)).frame(width: 70, alignment: .trailing)
+                        Text(Self.compact(row.chats)).frame(width: 70, alignment: .trailing)
+                        Spacer(minLength: 0)
+                    }
+                    .font(.system(.body, design: .monospaced))
+                    .lineLimit(1)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+
+    private func footer(_ projection: UsageAnalyticsProjection) -> some View {
+        HStack {
+            Text("Data through \(projection.dataThrough.map(Self.dateText) ?? "Unavailable")")
+            Spacer()
+            Text("Fetched \(Self.dateTimeText(projection.fetchedAt))")
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 2)
+    }
+
+    private func comparisonText(_ comparison: UsageComparison?) -> String {
+        guard case let .percent(value) = comparison else { return "Comparison unavailable" }
+        let sign = value > 0 ? "+" : ""
+        return "\(sign)\(Self.percent(value)) vs prior"
+    }
+
+    static func compact(_ value: Int64) -> String {
+        let units: [(Double, String)] = [(1_000_000_000, "B"), (1_000_000, "M"), (1_000, "K")]
+        let numeric = Double(value)
+        guard let unit = units.first(where: { abs(numeric) >= $0.0 }) else { return String(value) }
+        var text = String(
+            format: abs(numeric / unit.0) >= 100 ? "%.0f" : "%.1f",
+            locale: Locale(identifier: "en_US_POSIX"),
+            numeric / unit.0
+        )
+        if text.hasSuffix(".0") { text.removeLast(2) }
+        return text + unit.1
+    }
+
+    static func percent(_ value: Double?) -> String {
+        guard let value, value.isFinite else { return "Unavailable" }
+        var text = String(
+            format: "%.1f",
+            locale: Locale(identifier: "en_US_POSIX"),
+            value * 100
+        )
+        if text.hasSuffix(".0") { text.removeLast(2) }
+        return "\(text)%"
+    }
+
+    static func dayAccessibilityText(_ day: UsageDayCell) -> String {
+        switch day.state {
+        case let .observed(totals):
+            return "\(dateText(day.date)), observed, \(totals.totalTokens) tokens"
+        case let .activityOnly(turns, chats):
+            return "\(dateText(day.date)), activity only, \(turns) turns, \(chats) chats, token totals unavailable"
+        case .missing:
+            return "\(dateText(day.date)), missing"
+        }
+    }
+
+    static func dateText(_ date: Date) -> String {
+        date.formatted(.dateTime.year().month(.abbreviated).day().locale(Locale(identifier: "en_US_POSIX")))
+    }
+
+    static func dateTimeText(_ date: Date) -> String {
+        date.formatted(
+            .dateTime.year().month(.abbreviated).day().hour().minute().locale(Locale(identifier: "en_US_POSIX"))
+        )
+    }
+}
+
+private struct DashboardMetricCard: View {
+    let title: String
+    let value: String
+    let detail: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text(value).font(.title3.monospacedDigit().weight(.semibold))
+            Text(detail).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(.quaternary))
+    }
+}
+
+private struct DashboardSection<Content: View>: View {
+    let title: String
+    let subtitle: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title).font(.headline)
+                Spacer()
+                Text(subtitle).font(.caption).foregroundStyle(.secondary)
+            }
+            content
+        }
+        .padding(14)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(.quaternary))
+    }
+}
+
+private struct UsageHeatmapCell: View {
+    let day: UsageDayCell
+    let maximumTokens: Int64
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 2.5)
+            .fill(fillColor)
+            .overlay {
+                if case .missing = day.state {
+                    RoundedRectangle(cornerRadius: 2.5)
+                        .stroke(Color.secondary.opacity(0.45), lineWidth: 1)
+                }
+            }
+            .frame(height: 11)
+            .help(AnalyticsDashboardView.dayAccessibilityText(day))
+            .accessibilityLabel(AnalyticsDashboardView.dayAccessibilityText(day))
+    }
+
+    private var fillColor: Color {
+        switch day.state {
+        case .missing:
+            return .clear
+        case .activityOnly:
+            return Color.secondary.opacity(0.2)
+        case let .observed(totals):
+            guard maximumTokens > 0, totals.totalTokens > 0 else {
+                return Color.accentColor.opacity(0.12)
+            }
+            let intensity = log1p(Double(totals.totalTokens)) / log1p(Double(maximumTokens))
+            return Color.accentColor.opacity(0.2 + 0.75 * intensity)
+        }
+    }
+}
+
+private struct DashboardTableHeader: View {
+    let columns: [(String, CGFloat)]
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ForEach(Array(columns.enumerated()), id: \.offset) { index, column in
+                Text(column.0)
+                    .frame(width: column.1, alignment: index == 0 ? .leading : .trailing)
+            }
+            Spacer(minLength: 0)
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.secondary)
+    }
+}
+
+private struct DashboardEmptyRow: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 8)
+    }
+}

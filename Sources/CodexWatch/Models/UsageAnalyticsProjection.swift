@@ -17,6 +17,7 @@ enum UsageComparison: Equatable, Sendable {
 struct UsageDayCell: Equatable, Identifiable, Sendable {
     enum State: Equatable, Sendable {
         case observed(UsageTokenTotals)
+        case activityOnly(turns: Int64, chats: Int64)
         case missing
     }
 
@@ -64,8 +65,13 @@ struct UsageAnalyticsProjection: Equatable, Sendable {
     let clientBreakdownIsPartial: Bool
 
     var requestedDayCount: Int { range.rawValue }
-    var observedDayCount: Int { days.count { cell in if case .observed = cell.state { true } else { false } } }
-    var missingDayCount: Int { requestedDayCount - observedDayCount }
+    var observedDayCount: Int {
+        days.count { cell in if case .observed = cell.state { true } else { false } }
+    }
+    var activityOnlyDayCount: Int {
+        days.count { cell in if case .activityOnly = cell.state { true } else { false } }
+    }
+    var missingDayCount: Int { requestedDayCount - observedDayCount - activityOnlyDayCount }
     var totalTokens: Int64 { totals.totalTokens }
     var uncachedInputTokens: Int64 { totals.uncachedInputTokens }
     var cachedInputTokens: Int64 { totals.cachedInputTokens }
@@ -95,15 +101,24 @@ struct UsageAnalyticsProjection: Equatable, Sendable {
         )
         guard currentDates.count == range.rawValue else { return nil }
         let daysByDate = Dictionary(uniqueKeysWithValues: dataset.days.map { ($0.date, $0) })
-        let observedDays = currentDates.compactMap { daysByDate[$0] }
-        guard let totals = aggregateTotals(observedDays.map(\.totals)),
-              let models = aggregateModels(observedDays, totalTurns: totals.turns),
-              let clients = aggregateClients(observedDays) else { return nil }
+        let availableDays = currentDates.compactMap { daysByDate[$0] }
+        let tokenObservedDays = availableDays.filter(\.tokenDataIsAvailable)
+        guard let totals = aggregateTotals(availableDays.map(\.totals)),
+              let models = aggregateModels(availableDays, totalTurns: totals.turns),
+              let clients = aggregateClients(availableDays) else { return nil }
 
         let cells = currentDates.map { date in
-            UsageDayCell(
+            let state: UsageDayCell.State
+            if let day = daysByDate[date] {
+                state = day.tokenDataIsAvailable
+                    ? .observed(day.totals)
+                    : .activityOnly(turns: day.totals.turns, chats: day.totals.chats)
+            } else {
+                state = .missing
+            }
+            return UsageDayCell(
                 date: date,
-                state: daysByDate[date].map { .observed($0.totals) } ?? .missing
+                state: state
             )
         }
 
@@ -117,13 +132,13 @@ struct UsageAnalyticsProjection: Equatable, Sendable {
             clients: clients,
             comparison: comparison(
                 currentTotal: totals.totalTokens,
-                currentObservedCount: observedDays.count,
+                currentObservedCount: tokenObservedDays.count,
                 range: range,
                 periodStart: periodStart,
                 daysByDate: daysByDate,
                 calendar: calendar
             ),
-            dataThrough: observedDays.last?.date,
+            dataThrough: tokenObservedDays.last?.date,
             fetchedAt: dataset.fetchedAt,
             modelBreakdownIsPartial: dataset.modelBreakdownIsPartial,
             clientBreakdownIsPartial: dataset.clientBreakdownIsPartial
@@ -151,6 +166,7 @@ struct UsageAnalyticsProjection: Equatable, Sendable {
             calendar: calendar
         )
         let previousDays = previousDates.compactMap { daysByDate[$0] }
+            .filter(\.tokenDataIsAvailable)
         guard previousDays.count >= minimumComparisonCoverage(range.rawValue),
               let previousTotals = aggregateTotals(previousDays.map(\.totals)),
               previousTotals.totalTokens > 0 else { return nil }

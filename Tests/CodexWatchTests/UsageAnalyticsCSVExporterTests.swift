@@ -55,6 +55,36 @@ final class UsageAnalyticsCSVExporterTests: XCTestCase {
         )
     }
 
+    func testActivityOnlyCSVRowLeavesTokenFieldsBlank() throws {
+        let date = makeDate(year: 2026, month: 1, day: 15)
+        let projection = UsageAnalyticsProjection(
+            range: .days7,
+            periodStart: date,
+            periodEnd: date,
+            totals: UsageTokenTotals(
+                totalTokens: 0,
+                uncachedInputTokens: 0,
+                cachedInputTokens: 0,
+                outputTokens: 0,
+                turns: 5,
+                chats: 2
+            ),
+            days: [UsageDayCell(date: date, state: .activityOnly(turns: 5, chats: 2))],
+            models: [],
+            clients: [],
+            comparison: nil,
+            dataThrough: nil,
+            fetchedAt: date,
+            modelBreakdownIsPartial: false,
+            clientBreakdownIsPartial: false
+        )
+
+        let csv = try UsageAnalyticsCSVExporter.string(projection: projection)
+
+        XCTAssertTrue(csv.contains("2026-01-15,Activity only,,,,,5,2\r\n"))
+        XCTAssertFalse(csv.contains("2026-01-15,Observed,0,0,0,0,5,2"))
+    }
+
     private func makeCSVProjection() -> UsageAnalyticsProjection {
         let observedDate = makeDate(year: 2026, month: 8, day: 19)
         let missingDate = makeDate(year: 2026, month: 8, day: 20)

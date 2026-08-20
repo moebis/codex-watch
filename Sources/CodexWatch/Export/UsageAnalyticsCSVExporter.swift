@@ -31,6 +31,11 @@ enum UsageAnalyticsCSVExporter {
                     String(totals.turns),
                     String(totals.chats)
                 ])
+            case let .activityOnly(turns, chats):
+                rows.append([
+                    dateText(day.date), "Activity only", "", "", "", "",
+                    String(turns), String(chats)
+                ])
             case .missing:
                 rows.append([dateText(day.date), "Missing", "", "", "", "", "", ""])
             }

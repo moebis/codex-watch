@@ -11,8 +11,9 @@ struct UsageAnalyticsPresentation: Equatable {
     let chats: String
     let coverage: String
     let dataThrough: String
+    let staleValue: String?
 
-    init(projection: UsageAnalyticsProjection) {
+    init(projection: UsageAnalyticsProjection, isStale: Bool = false) {
         totalTokens = Self.compact(projection.totalTokens)
         inputTokens = Self.compact(projection.uncachedInputTokens)
         cachedInputTokens = Self.compact(projection.cachedInputTokens)
@@ -21,6 +22,7 @@ struct UsageAnalyticsPresentation: Equatable {
         chats = Self.compact(projection.chats)
         coverage = "\(projection.observedDayCount)/\(projection.requestedDayCount) days"
         dataThrough = projection.dataThrough.map(Self.dateFormatter.string(from:)) ?? "Unavailable"
+        staleValue = isStale ? "Stale · refresh unavailable" : nil
     }
 
     private static func compact(_ value: Int64) -> String {
@@ -51,9 +53,11 @@ struct UsageAnalyticsPresentation: Equatable {
 final class UsageAnalyticsMenuView: NSView {
     static let width: CGFloat = 260
     static let height: CGFloat = 210
+    static let staleHeightIncrement: CGFloat = 18
 
     init(presentation: UsageAnalyticsPresentation) {
-        super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: Self.height))
+        let viewHeight = Self.height + (presentation.staleValue == nil ? 0 : Self.staleHeightIncrement)
+        super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: viewHeight))
         translatesAutoresizingMaskIntoConstraints = false
 
         let titleLabel = NSTextField(labelWithString: presentation.title)
@@ -67,10 +71,18 @@ final class UsageAnalyticsMenuView: NSView {
             Self.labelRow(title: "Output tokens", value: presentation.outputTokens),
             Self.labelRow(title: "Turns", value: presentation.turns),
             Self.labelRow(title: "Chats", value: presentation.chats),
-            Self.labelRow(title: "Coverage", value: presentation.coverage),
+            Self.labelRow(title: "Token coverage", value: presentation.coverage),
             Self.labelRow(title: "Data through", value: presentation.dataThrough)
         ]
-        let stack = NSStackView(views: [titleLabel] + rows)
+        var views: [NSView] = [titleLabel]
+        if let staleValue = presentation.staleValue {
+            let staleLabel = NSTextField(labelWithString: staleValue)
+            staleLabel.font = .systemFont(ofSize: 11, weight: .medium)
+            staleLabel.textColor = .systemOrange
+            views.append(staleLabel)
+        }
+        views.append(contentsOf: rows)
+        let stack = NSStackView(views: views)
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 5
@@ -83,7 +95,7 @@ final class UsageAnalyticsMenuView: NSView {
 
         NSLayoutConstraint.activate([
             widthAnchor.constraint(equalToConstant: Self.width),
-            heightAnchor.constraint(equalToConstant: Self.height),
+            heightAnchor.constraint(equalToConstant: viewHeight),
             stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
             stack.topAnchor.constraint(equalTo: topAnchor, constant: 10)

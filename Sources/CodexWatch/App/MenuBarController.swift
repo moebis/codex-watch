@@ -11,6 +11,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private var snapshot: UsageSnapshot?
     private var errorState: MenuBarErrorState?
     private(set) var analyticsStale = false
+    private var analyticsWindowController: AnalyticsWindowController?
 
     init(
         statusItem: NSStatusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength),
@@ -131,6 +132,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             errorState = error
         }
         updateStatusButton()
+        analyticsWindowController?.update(
+            dataset: snapshot?.analyticsDataset,
+            errorState: dashboardErrorState
+        )
         rebuildMenu()
     }
 
@@ -164,7 +169,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             menu.addItem(.separator())
             let analyticsItem = NSMenuItem()
             analyticsItem.view = UsageAnalyticsMenuView(
-                presentation: UsageAnalyticsPresentation(projection: projection)
+                presentation: UsageAnalyticsPresentation(
+                    projection: projection,
+                    isStale: analyticsStale
+                )
             )
             menu.addItem(analyticsItem)
         }
@@ -173,6 +181,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(actionItem(title: "Refresh Now", action: #selector(refreshNow), keyEquivalent: "r"))
         menu.addItem(refreshFrequencyItem())
         menu.addItem(actionItem(title: "Open ChatGPT", action: #selector(openChatGPT), keyEquivalent: "o"))
+        menu.addItem(
+            actionItem(
+                title: "Open Analytics Dashboard…",
+                action: #selector(openAnalyticsDashboard),
+                keyEquivalent: "d"
+            )
+        )
         menu.addItem(
             actionItem(
                 title: "Open Usage Analytics…",
@@ -231,6 +246,24 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func openUsageAnalytics() {
         NSWorkspace.shared.open(AppIdentity.usageAnalyticsURL)
+    }
+
+    @objc private func openAnalyticsDashboard() {
+        let controller: AnalyticsWindowController
+        if let analyticsWindowController {
+            controller = analyticsWindowController
+        } else {
+            controller = AnalyticsWindowController()
+            analyticsWindowController = controller
+        }
+        controller.show(
+            dataset: snapshot?.analyticsDataset,
+            errorState: dashboardErrorState
+        )
+    }
+
+    private var dashboardErrorState: AnalyticsDashboardErrorState? {
+        analyticsStale || snapshot?.analyticsDataset == nil ? .analyticsUnavailable : nil
     }
 
     @objc private func quit() {

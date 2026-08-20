@@ -17,6 +17,21 @@ struct UsageAnalyticsDay: Equatable, Sendable {
     let totals: UsageTokenTotals
     let models: [UsageModelActivity]
     let clients: [UsageClientActivity]
+    let tokenDataIsAvailable: Bool
+
+    init(
+        date: Date,
+        totals: UsageTokenTotals,
+        models: [UsageModelActivity],
+        clients: [UsageClientActivity],
+        tokenDataIsAvailable: Bool = true
+    ) {
+        self.date = date
+        self.totals = totals
+        self.models = models
+        self.clients = clients
+        self.tokenDataIsAvailable = tokenDataIsAvailable
+    }
 }
 
 struct UsageTokenTotals: Equatable, Sendable {

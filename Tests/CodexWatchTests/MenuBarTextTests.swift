@@ -39,6 +39,7 @@ final class MenuBarTextTests: XCTestCase {
         let menuTitles = statusItem.menu?.items.map(\.title) ?? []
 
         XCTAssertTrue(menuTitles.contains("Open Usage Analytics…"))
+        XCTAssertTrue(menuTitles.contains("Open Analytics Dashboard…"))
         XCTAssertTrue(menuTitles.contains("Refresh Frequency"))
         XCTAssertFalse(menuTitles.contains { $0.localizedCaseInsensitiveContains("update") })
         XCTAssertEqual(
@@ -97,6 +98,28 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertFalse(presentation.dataThrough.isEmpty)
     }
 
+    func testUsageAnalyticsMenuLabelsPreservedAnalyticsAsStale() {
+        let presentation = UsageAnalyticsPresentation(
+            projection: makeAnalyticsProjection(
+                totalTokens: 100,
+                inputTokens: 20,
+                cachedInputTokens: 30,
+                outputTokens: 50,
+                turns: 4,
+                chats: 2
+            ),
+            isStale: true
+        )
+        let view = UsageAnalyticsMenuView(presentation: presentation)
+
+        XCTAssertEqual(presentation.staleValue, "Stale · refresh unavailable")
+        XCTAssertTrue(textValues(in: view).contains("Stale · refresh unavailable"))
+        XCTAssertEqual(
+            view.frame.height,
+            UsageAnalyticsMenuView.height + UsageAnalyticsMenuView.staleHeightIncrement
+        )
+    }
+
     func testUsageAnalyticsMenuContainsSixLabeledRows() {
         let view = UsageAnalyticsMenuView(
             presentation: UsageAnalyticsPresentation(
@@ -119,7 +142,7 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertTrue(values.contains("Output tokens"))
         XCTAssertTrue(values.contains("Turns"))
         XCTAssertTrue(values.contains("Chats"))
-        XCTAssertTrue(values.contains("Coverage"))
+        XCTAssertTrue(values.contains("Token coverage"))
         XCTAssertTrue(values.contains("Data through"))
         XCTAssertEqual(view.frame.width, UsageAnalyticsMenuView.width)
     }
@@ -264,6 +287,7 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertEqual(presentation.quotaWindows[1].paceText, "10% in deficit")
         XCTAssertEqual(presentation.quotaWindows[2].paceText, "25% in reserve")
         XCTAssertEqual(presentation.quotaWindows[3].paceText, "On pace")
+        XCTAssertEqual(presentation.quotaValue, "40%")
     }
 
     func testProgressMenuRendersNamedQuotaAndPaceLabels() {

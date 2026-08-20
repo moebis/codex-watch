@@ -29,7 +29,7 @@ struct UsageAnalyticsResponseDTO: Decodable {
                   let date = Self.parseDate(dateText, calendar: calendar),
                   (normalizedStart ... normalizedEnd).contains(date),
                   observedDates.insert(date).inserted,
-                  let totals = day.totals?.validatedTotals else { return nil }
+                  let validatedTotals = day.totals?.validatedDayTotals else { return nil }
 
             var models: [UsageModelActivity] = []
             if day.modelBreakdownDecodeFailed { modelBreakdownIsPartial = true }
@@ -53,9 +53,10 @@ struct UsageAnalyticsResponseDTO: Decodable {
 
             validatedDays.append(UsageAnalyticsDay(
                 date: date,
-                totals: totals,
+                totals: validatedTotals.totals,
                 models: models,
-                clients: clients
+                clients: clients,
+                tokenDataIsAvailable: validatedTotals.tokenDataIsAvailable
             ))
         }
 
@@ -183,6 +184,40 @@ struct UsageAnalyticsTotalsDTO: Decodable {
         )
     }
 
+    var validatedDayTotals: ValidatedAnalyticsDayTotals? {
+        if let totals = validatedTotals {
+            return ValidatedAnalyticsDayTotals(totals: totals, tokenDataIsAvailable: true)
+        }
+
+        let tokenValues = [
+            uncachedTextInputTokens,
+            cachedTextInputTokens,
+            textOutputTokens,
+            textTotalTokens
+        ]
+        guard tokenValues.allSatisfy({ $0 == nil }),
+              let threads,
+              threads >= 0,
+              let turns,
+              turns >= 0 else { return nil }
+        return ValidatedAnalyticsDayTotals(
+            totals: UsageTokenTotals(
+                totalTokens: 0,
+                uncachedInputTokens: 0,
+                cachedInputTokens: 0,
+                outputTokens: 0,
+                turns: turns,
+                chats: threads
+            ),
+            tokenDataIsAvailable: false
+        )
+    }
+
+}
+
+struct ValidatedAnalyticsDayTotals: Equatable {
+    let totals: UsageTokenTotals
+    let tokenDataIsAvailable: Bool
 }
 
 struct UsageAnalyticsModelDTO: Decodable {
