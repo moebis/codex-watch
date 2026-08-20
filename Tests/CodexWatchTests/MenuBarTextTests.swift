@@ -196,6 +196,83 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertNotNil(presentation.resetDetail)
     }
 
+    func testProgressPresentationIncludesEveryQuotaWindowAndItsPace() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let weekly = UsageWindow(
+            id: "weekly",
+            kind: .weekly,
+            usedPercent: 60,
+            resetAt: now.addingTimeInterval(2 * 86_400),
+            durationSeconds: 7 * 86_400
+        )
+        let fiveHour = UsageWindow(
+            id: "primary",
+            kind: .rolling(hours: 5),
+            usedPercent: 60,
+            resetAt: now.addingTimeInterval(2.5 * 3_600),
+            durationSeconds: 5 * 3_600
+        )
+        let spark = UsageWindow(
+            id: "codex-spark",
+            kind: .rolling(hours: 5),
+            usedPercent: 25,
+            resetAt: now.addingTimeInterval(2.5 * 3_600),
+            durationSeconds: 5 * 3_600
+        )
+        let codeReview = UsageWindow(
+            id: "code-review-primary",
+            kind: .daily,
+            usedPercent: 50,
+            resetAt: now.addingTimeInterval(12 * 3_600),
+            durationSeconds: 24 * 3_600
+        )
+        let snapshot = UsageSnapshot(
+            windows: [fiveHour, weekly],
+            additionalWindows: [NamedUsageWindow(id: spark.id, title: "Codex Spark 5-hour", window: spark)],
+            codeReviewWindows: [NamedUsageWindow(id: codeReview.id, title: "Code Review", window: codeReview)]
+        )
+
+        let presentation = QuotaProgressPresentation(snapshot: snapshot, error: nil, now: now)
+
+        XCTAssertEqual(
+            presentation.quotaWindows.map(\.title),
+            ["Weekly", "5-hour", "Codex Spark 5-hour", "Code Review"]
+        )
+        XCTAssertEqual(presentation.quotaWindows[0].paceText, "11% in reserve")
+        XCTAssertEqual(presentation.quotaWindows[1].paceText, "10% in deficit")
+        XCTAssertEqual(presentation.quotaWindows[2].paceText, "25% in reserve")
+        XCTAssertEqual(presentation.quotaWindows[3].paceText, "On pace")
+    }
+
+    func testProgressMenuRendersNamedQuotaAndPaceLabels() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let spark = UsageWindow(
+            id: "codex-spark",
+            kind: .rolling(hours: 5),
+            usedPercent: 25,
+            resetAt: now.addingTimeInterval(2.5 * 3_600),
+            durationSeconds: 5 * 3_600
+        )
+        let view = QuotaProgressMenuView(
+            presentation: QuotaProgressPresentation(
+                snapshot: UsageSnapshot(
+                    windows: [],
+                    additionalWindows: [NamedUsageWindow(
+                        id: spark.id,
+                        title: "Codex Spark 5-hour",
+                        window: spark
+                    )]
+                ),
+                error: nil,
+                now: now
+            )
+        )
+
+        let values = textValues(in: view)
+        XCTAssertTrue(values.contains("Codex Spark 5-hour remaining"))
+        XCTAssertTrue(values.contains("25% in reserve"))
+    }
+
     func testPlanDisplayUsesNormalizedNameAndNeverExposesUnknownValues() {
         let known = QuotaProgressPresentation(
             snapshot: UsageSnapshot(plan: .proLite, windows: []),
