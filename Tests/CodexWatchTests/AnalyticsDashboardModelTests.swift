@@ -4,6 +4,19 @@ import XCTest
 
 @MainActor
 final class AnalyticsDashboardModelTests: XCTestCase {
+    func testDashboardRestoresAndPersistsTopLevelSection() {
+        let suiteName = "AnalyticsDashboardModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("lifetime", forKey: "codexWatch.analyticsSection")
+
+        let model = AnalyticsDashboardModel(defaults: defaults, calendar: utcCalendar())
+
+        XCTAssertEqual(model.section, .lifetime)
+        model.section = .usage
+        XCTAssertEqual(defaults.string(forKey: "codexWatch.analyticsSection"), "usage")
+    }
+
     func testDashboardRestoresRangeAndReprojectsNewDataset() throws {
         let suiteName = "AnalyticsDashboardModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -53,6 +66,36 @@ final class AnalyticsDashboardModelTests: XCTestCase {
         )
     }
 
+    func testDashboardKeepsProfileAndMarksOnlyProfileSurfaceStale() {
+        let suiteName = "AnalyticsDashboardModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let model = AnalyticsDashboardModel(defaults: defaults, calendar: utcCalendar())
+        let now = day("2026-08-20")
+        let profile = makeProfile(total: 30_300_000_000, fetchedAt: now)
+
+        model.update(
+            dataset: makeDashboardDataset(total: 100),
+            error: nil,
+            profileStats: profile,
+            profileError: nil,
+            now: now
+        )
+        model.update(
+            dataset: makeDashboardDataset(total: 200),
+            error: nil,
+            profileStats: nil,
+            profileError: .profileUnavailable,
+            now: now
+        )
+
+        XCTAssertEqual(model.projection?.totalTokens, 200)
+        XCTAssertFalse(model.isStale)
+        XCTAssertEqual(model.lifetime?.lifetimeTokens, "30.3B")
+        XCTAssertTrue(model.profileIsStale)
+        XCTAssertEqual(model.profileErrorState, .profileUnavailable)
+    }
+
     private func makeDashboardDataset(total: Int64) -> UsageAnalyticsDataset {
         let end = day("2026-08-20")
         let start = utcCalendar().date(byAdding: .day, value: -364, to: end)!
@@ -75,6 +118,27 @@ final class AnalyticsDashboardModelTests: XCTestCase {
             fetchedAt: end,
             modelBreakdownIsPartial: false,
             clientBreakdownIsPartial: false
+        )
+    }
+
+    private func makeProfile(total: Int64, fetchedAt: Date) -> CodexProfileStats {
+        CodexProfileStats(
+            lifetimeTokens: total,
+            peakDailyTokens: nil,
+            longestRunningTurnSeconds: nil,
+            currentStreakDays: nil,
+            longestStreakDays: nil,
+            dailyBuckets: [],
+            insights: CodexProfileInsights(
+                fastModePercent: nil,
+                reasoningEffort: nil,
+                reasoningEffortPercent: nil,
+                uniqueSkillsUsed: nil,
+                totalSkillsUsed: nil,
+                totalChats: nil
+            ),
+            invocations: [],
+            fetchedAt: fetchedAt
         )
     }
 

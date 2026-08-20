@@ -14,15 +14,37 @@ final class AnalyticsWindowController: NSObject, NSWindowDelegate {
         super.init()
     }
 
-    func show(dataset: UsageAnalyticsDataset?, errorState: AnalyticsDashboardErrorState?) {
-        model.update(dataset: dataset, error: errorState, now: .now)
+    func show(
+        dataset: UsageAnalyticsDataset?,
+        errorState: AnalyticsDashboardErrorState?,
+        profileStats: CodexProfileStats?,
+        profileErrorState: AnalyticsDashboardErrorState?
+    ) {
+        model.update(
+            dataset: dataset,
+            error: errorState,
+            profileStats: profileStats,
+            profileError: profileErrorState,
+            now: .now
+        )
         let window = window ?? makeWindow()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    func update(dataset: UsageAnalyticsDataset?, errorState: AnalyticsDashboardErrorState?) {
-        model.update(dataset: dataset, error: errorState, now: .now)
+    func update(
+        dataset: UsageAnalyticsDataset?,
+        errorState: AnalyticsDashboardErrorState?,
+        profileStats: CodexProfileStats?,
+        profileErrorState: AnalyticsDashboardErrorState?
+    ) {
+        model.update(
+            dataset: dataset,
+            error: errorState,
+            profileStats: profileStats,
+            profileError: profileErrorState,
+            now: .now
+        )
     }
 
     func windowWillClose(_ notification: Notification) {

@@ -9,33 +9,28 @@ struct AnalyticsDashboardView: View {
         VStack(spacing: 16) {
             header
 
-            Picker("Range", selection: $model.range) {
-                ForEach(AnalyticsRange.allCases) { range in
-                    Text(range.title).tag(range)
+            Picker("Dashboard", selection: $model.section) {
+                ForEach(AnalyticsDashboardSection.allCases) { section in
+                    Text(section.title).tag(section)
                 }
             }
             .pickerStyle(.segmented)
-            .accessibilityLabel("Analytics range")
+            .accessibilityLabel("Analytics section")
+            .frame(maxWidth: 300)
 
-            if let projection = model.projection {
-                ScrollView {
-                    VStack(spacing: 16) {
-                        summaryCards(projection)
-                        tokenChart(projection)
-                        activityHeatmap(projection)
-                        modelActivityTable(projection)
-                        clientTokenTable(projection)
-                        footer(projection)
+            switch model.section {
+            case .usage:
+                Picker("Range", selection: $model.range) {
+                    ForEach(AnalyticsRange.allCases) { range in
+                        Text(range.title).tag(range)
                     }
-                    .padding(.bottom, 4)
                 }
-            } else {
-                ContentUnavailableView(
-                    "Analytics unavailable",
-                    systemImage: "chart.xyaxis.line",
-                    description: Text("Refresh Codex Watch after signing in to ChatGPT.")
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .pickerStyle(.segmented)
+                .accessibilityLabel("Analytics range")
+
+                usageContent
+            case .lifetime:
+                LifetimeDashboardView(model: model.lifetime)
             }
         }
         .padding(20)
@@ -53,7 +48,7 @@ struct AnalyticsDashboardView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if model.isStale {
+            if selectedSurfaceIsStale {
                 Label("Stale data", systemImage: "exclamationmark.triangle.fill")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.orange)
@@ -61,11 +56,44 @@ struct AnalyticsDashboardView: View {
                     .padding(.vertical, 5)
                     .background(.orange.opacity(0.12), in: Capsule())
             }
-            Button("Export CSV…", systemImage: "square.and.arrow.up") {
-                onExport()
+            if model.section == .usage {
+                Button("Export CSV…", systemImage: "square.and.arrow.up") {
+                    onExport()
+                }
+                .disabled(model.projection == nil)
+                .accessibilityHint("Choose where to save the selected analytics range")
             }
-            .disabled(model.projection == nil)
-            .accessibilityHint("Choose where to save the selected analytics range")
+        }
+    }
+
+    @ViewBuilder
+    private var usageContent: some View {
+        if let projection = model.projection {
+            ScrollView {
+                VStack(spacing: 16) {
+                    summaryCards(projection)
+                    tokenChart(projection)
+                    activityHeatmap(projection)
+                    modelActivityTable(projection)
+                    clientTokenTable(projection)
+                    footer(projection)
+                }
+                .padding(.bottom, 4)
+            }
+        } else {
+            ContentUnavailableView(
+                "Analytics unavailable",
+                systemImage: "chart.xyaxis.line",
+                description: Text("Refresh Codex Watch after signing in to ChatGPT.")
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private var selectedSurfaceIsStale: Bool {
+        switch model.section {
+        case .usage: model.isStale
+        case .lifetime: model.profileIsStale
         }
     }
 
@@ -299,7 +327,7 @@ struct AnalyticsDashboardView: View {
     }
 }
 
-private struct DashboardMetricCard: View {
+struct DashboardMetricCard: View {
     let title: String
     let value: String
     let detail: String
@@ -317,7 +345,7 @@ private struct DashboardMetricCard: View {
     }
 }
 
-private struct DashboardSection<Content: View>: View {
+struct DashboardSection<Content: View>: View {
     let title: String
     let subtitle: String
     @ViewBuilder let content: Content
@@ -387,7 +415,7 @@ private struct DashboardTableHeader: View {
     }
 }
 
-private struct DashboardEmptyRow: View {
+struct DashboardEmptyRow: View {
     let text: String
 
     var body: some View {

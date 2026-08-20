@@ -1,0 +1,150 @@
+import Foundation
+import XCTest
+@testable import CodexWatch
+
+final class LifetimeDashboardModelTests: XCTestCase {
+    func testHeadlineMetricsMatchOfficialProfileSemantics() {
+        let model = LifetimeDashboardModel(
+            profile: makeProfile(
+                lifetimeTokens: 30_300_000_000,
+                peakTokens: 1_100_000_000,
+                longestSeconds: 56_580,
+                currentStreak: 42,
+                longestStreak: 82
+            ),
+            calendar: utcCalendar()
+        )
+
+        XCTAssertEqual(model.lifetimeTokens, "30.3B")
+        XCTAssertEqual(model.peakTokens, "1.1B")
+        XCTAssertEqual(model.longestChat, "15h 43m")
+        XCTAssertEqual(model.currentStreak, "42 days")
+        XCTAssertEqual(model.longestStreak, "82 days")
+    }
+
+    func testMissingHeadlineMetricsRemainUnavailable() {
+        let model = LifetimeDashboardModel(
+            profile: makeProfile(
+                lifetimeTokens: nil,
+                peakTokens: nil,
+                longestSeconds: nil,
+                currentStreak: nil,
+                longestStreak: nil
+            ),
+            calendar: utcCalendar()
+        )
+
+        XCTAssertEqual(model.lifetimeTokens, "Unavailable")
+        XCTAssertEqual(model.peakTokens, "Unavailable")
+        XCTAssertEqual(model.longestChat, "Unavailable")
+        XCTAssertEqual(model.currentStreak, "Unavailable")
+        XCTAssertEqual(model.longestStreak, "Unavailable")
+    }
+
+    func testActivityDaysRemainChronologicalAndDoNotTurnGapsIntoZero() {
+        let profile = makeProfile(
+            lifetimeTokens: 1,
+            peakTokens: 1,
+            longestSeconds: 60,
+            currentStreak: 1,
+            longestStreak: 1,
+            dailyBuckets: [
+                CodexProfileDailyBucket(date: day("2026-08-18"), tokens: 20),
+                CodexProfileDailyBucket(date: day("2026-08-20"), tokens: 40)
+            ]
+        )
+
+        let model = LifetimeDashboardModel(profile: profile, calendar: utcCalendar())
+
+        XCTAssertEqual(model.activityDays.map(\.date), [
+            day("2026-08-18"), day("2026-08-19"), day("2026-08-20")
+        ])
+        XCTAssertEqual(model.activityDays.map(\.tokens), [20, nil, 40])
+        XCTAssertEqual(model.observedBucketCount, 2)
+        XCTAssertEqual(model.maximumDailyTokens, 40)
+        XCTAssertEqual(model.activityCoverage, "2 server-observed days · Aug 18–Aug 20, 2026")
+        XCTAssertEqual(
+            LifetimeDashboardModel.accessibilityText(model.activityDays[1]),
+            "Aug 19, 2026, token activity unavailable"
+        )
+    }
+
+    func testInsightsAndInvocationsUseServerValues() {
+        let profile = CodexProfileStats(
+            lifetimeTokens: 1,
+            peakDailyTokens: 1,
+            longestRunningTurnSeconds: 1,
+            currentStreakDays: 1,
+            longestStreakDays: 1,
+            dailyBuckets: [],
+            insights: CodexProfileInsights(
+                fastModePercent: 7,
+                reasoningEffort: "Extra High",
+                reasoningEffortPercent: 60,
+                uniqueSkillsUsed: 82,
+                totalSkillsUsed: 8_369,
+                totalChats: 6_316
+            ),
+            invocations: [
+                CodexProfileInvocation(
+                    id: "plugin:superpowers",
+                    displayName: "superpowers",
+                    kind: .plugin,
+                    usageCount: 6_122
+                )
+            ],
+            fetchedAt: day("2026-08-20")
+        )
+
+        let model = LifetimeDashboardModel(profile: profile, calendar: utcCalendar())
+
+        XCTAssertEqual(model.insights.map(\.value), ["7%", "Extra High · 60%", "82", "8.4K", "6.3K"])
+        XCTAssertEqual(model.invocations.first?.name, "@superpowers")
+        XCTAssertEqual(model.invocations.first?.usage, "6.1K runs")
+        XCTAssertEqual(model.dataThrough, "Aug 20, 2026")
+    }
+
+    private func makeProfile(
+        lifetimeTokens: Int64?,
+        peakTokens: Int64?,
+        longestSeconds: Int64?,
+        currentStreak: Int?,
+        longestStreak: Int?,
+        dailyBuckets: [CodexProfileDailyBucket] = []
+    ) -> CodexProfileStats {
+        CodexProfileStats(
+            lifetimeTokens: lifetimeTokens,
+            peakDailyTokens: peakTokens,
+            longestRunningTurnSeconds: longestSeconds,
+            currentStreakDays: currentStreak,
+            longestStreakDays: longestStreak,
+            dailyBuckets: dailyBuckets,
+            insights: CodexProfileInsights(
+                fastModePercent: nil,
+                reasoningEffort: nil,
+                reasoningEffortPercent: nil,
+                uniqueSkillsUsed: nil,
+                totalSkillsUsed: nil,
+                totalChats: nil
+            ),
+            invocations: [],
+            fetchedAt: day("2026-08-20")
+        )
+    }
+
+    private func day(_ value: String) -> Date {
+        let parts = value.split(separator: "-").compactMap { Int($0) }
+        return utcCalendar().date(from: DateComponents(
+            year: parts[0],
+            month: parts[1],
+            day: parts[2]
+        ))!
+    }
+
+    private func utcCalendar() -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_US_POSIX")
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
+}

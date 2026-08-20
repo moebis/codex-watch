@@ -163,7 +163,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         updateStatusButton()
         analyticsWindowController?.update(
             dataset: snapshot?.analyticsDataset,
-            errorState: dashboardErrorState
+            errorState: dashboardErrorState,
+            profileStats: snapshot?.profileStats,
+            profileErrorState: profileDashboardErrorState
         )
         rebuildMenu()
     }
@@ -309,12 +311,18 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         controller.show(
             dataset: snapshot?.analyticsDataset,
-            errorState: dashboardErrorState
+            errorState: dashboardErrorState,
+            profileStats: snapshot?.profileStats,
+            profileErrorState: profileDashboardErrorState
         )
     }
 
     private var dashboardErrorState: AnalyticsDashboardErrorState? {
         analyticsStale || snapshot?.analyticsDataset == nil ? .analyticsUnavailable : nil
+    }
+
+    private var profileDashboardErrorState: AnalyticsDashboardErrorState? {
+        profileStale || snapshot?.profileStats == nil ? .profileUnavailable : nil
     }
 
     @objc private func quit() {
