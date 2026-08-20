@@ -76,9 +76,13 @@ struct CodexProfileResponseDTO: Decodable {
             )
         }
         let ranked = invocations.sorted {
-            $0.usageCount == $1.usageCount
-                ? $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
-                : $0.usageCount > $1.usageCount
+            guard $0.usageCount == $1.usageCount else {
+                return $0.usageCount > $1.usageCount
+            }
+            let nameOrder = $0.displayName.localizedCaseInsensitiveCompare($1.displayName)
+            guard nameOrder == .orderedSame else { return nameOrder == .orderedAscending }
+            guard $0.displayName != $1.displayName else { return $0.id < $1.id }
+            return $0.displayName < $1.displayName
         }
         return Array(ranked.prefix(Self.maximumInvocationCount))
     }

@@ -117,6 +117,20 @@ final class CodexProfileStatsTests: XCTestCase {
         XCTAssertEqual(profile.invocations.last?.usageCount, 26)
     }
 
+    func testEqualInvocationRanksHaveATotalDeterministicOrder() throws {
+        let response = try JSONDecoder().decode(
+            CodexProfileResponseDTO.self,
+            from: Data(
+                #"{"stats":{"top_invocations":[{"plugin_id":"lower","plugin_name":"alpha","type":"plugin","usage_count":10},{"plugin_id":"upper","plugin_name":"ALPHA","type":"plugin","usage_count":10}]}}"#.utf8
+            )
+        )
+
+        let profile = try XCTUnwrap(response.profileStats())
+
+        XCTAssertEqual(profile.invocations.map(\.displayName), ["ALPHA", "alpha"])
+        XCTAssertEqual(profile.invocations.map(\.id), ["plugin:upper", "plugin:lower"])
+    }
+
     private func utcCalendar() -> Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = Locale(identifier: "en_US_POSIX")
