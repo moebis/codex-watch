@@ -103,6 +103,7 @@ struct UsageSnapshot: Equatable, Sendable {
     let spendControl: SpendControlSummary?
     private let reportedAvailableResetCredits: Int?
     let analyticsDataset: UsageAnalyticsDataset?
+    let profileStats: CodexProfileStats?
     let fetchedAt: Date
 
     init(
@@ -117,6 +118,7 @@ struct UsageSnapshot: Equatable, Sendable {
         nextResetCreditGrantedAt: Date? = nil,
         nextResetCreditExpiry: Date? = nil,
         analyticsDataset: UsageAnalyticsDataset? = nil,
+        profileStats: CodexProfileStats? = nil,
         fetchedAt: Date = .now
     ) {
         self.plan = plan
@@ -140,6 +142,7 @@ struct UsageSnapshot: Equatable, Sendable {
             self.resetCredits = resetCredits
         }
         self.analyticsDataset = analyticsDataset
+        self.profileStats = profileStats
         self.fetchedAt = fetchedAt
     }
 
@@ -173,6 +176,7 @@ struct UsageSnapshot: Equatable, Sendable {
             spendControl: spendControl,
             availableResetCredits: availableResetCredits,
             analyticsDataset: analyticsDataset,
+            profileStats: profileStats,
             fetchedAt: fetchedAt
         )
     }
@@ -188,6 +192,23 @@ struct UsageSnapshot: Equatable, Sendable {
             spendControl: spendControl,
             availableResetCredits: availableResetCredits,
             analyticsDataset: newAnalyticsDataset ?? analyticsDataset,
+            profileStats: profileStats,
+            fetchedAt: fetchedAt
+        )
+    }
+
+    func adding(profileStats newProfileStats: CodexProfileStats?) -> UsageSnapshot {
+        UsageSnapshot(
+            plan: plan,
+            creditsRemaining: creditsRemaining,
+            windows: windows,
+            additionalWindows: additionalWindows,
+            codeReviewWindows: codeReviewWindows,
+            resetCredits: resetCredits,
+            spendControl: spendControl,
+            availableResetCredits: availableResetCredits,
+            analyticsDataset: analyticsDataset,
+            profileStats: newProfileStats ?? profileStats,
             fetchedAt: fetchedAt
         )
     }

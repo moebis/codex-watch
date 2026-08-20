@@ -83,6 +83,65 @@ final class CodexUsageClientTests: XCTestCase {
         }
     }
 
+    func testProfileRequestUsesSameHostEndpointAndExistingCredentials() async throws {
+        let responseData = try Data(contentsOf: fixtureURL("profile-stats-complete.json"))
+        let fetchedAt = ISO8601DateFormatter().date(from: "2026-08-20T12:00:00Z")!
+        MockURLProtocol.requestHandler = { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.url?.path, "/backend-api/wham/profiles/me")
+            XCTAssertNil(request.url?.query)
+            XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalCacheData)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/json")
+            XCTAssertEqual(
+                request.value(forHTTPHeaderField: "Authorization"),
+                "Bearer fixture-access-token"
+            )
+            XCTAssertEqual(request.value(forHTTPHeaderField: "ChatGPT-Account-Id"), "acct_fixture")
+            return (self.response(status: 200, url: request.url), responseData)
+        }
+
+        let profile = try await makeClient().fetchProfileStats(referenceDate: fetchedAt)
+
+        XCTAssertEqual(profile.lifetimeTokens, 30_300_000_000)
+        XCTAssertEqual(profile.fetchedAt, fetchedAt)
+    }
+
+    func testProfileEndpointOnAnotherHostIsRejectedBeforeSendingCredentials() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        MockURLProtocol.requestHandler = { _ in
+            XCTFail("A profile request to another host must not be sent")
+            return (self.response(status: 500), Data())
+        }
+        let client = CodexUsageClient(
+            credentials: CodexCredentials(accessToken: "fixture-access-token", accountID: nil),
+            session: URLSession(configuration: configuration),
+            endpoint: URL(string: "https://example.test/backend-api/wham/usage")!,
+            profileEndpoint: URL(string: "https://other.example/profiles/me")!
+        )
+
+        do {
+            _ = try await client.fetchProfileStats()
+            XCTFail("Expected an invalid response error")
+        } catch let error as CodexUsageError {
+            XCTAssertEqual(error, .invalidHTTPResponse)
+        }
+    }
+
+    func testOversizedProfileResponseIsRejectedBeforeDecoding() async throws {
+        let oversizedResponse = Data(repeating: 0x20, count: 1_048_577)
+        MockURLProtocol.requestHandler = { request in
+            (self.response(status: 200, url: request.url), oversizedResponse)
+        }
+
+        do {
+            _ = try await makeClient().fetchProfileStats()
+            XCTFail("Expected an oversized response error")
+        } catch let error as URLError {
+            XCTAssertEqual(error.code, .dataLengthExceedsMaximum)
+        }
+    }
+
     func testOversizedAnalyticsResponseIsRejectedBeforeDecoding() async throws {
         let oversizedResponse = Data(repeating: 0x20, count: 1_048_577)
         MockURLProtocol.requestHandler = { request in
@@ -111,6 +170,30 @@ final class CodexUsageClientTests: XCTestCase {
         let snapshot = UsageSnapshot(windows: [], analyticsDataset: previous)
 
         XCTAssertEqual(snapshot.adding(analyticsDataset: nil).analyticsDataset, previous)
+    }
+
+    func testMissingNewProfilePreservesLastSuccessfulInMemoryProfile() {
+        let previous = CodexProfileStats(
+            lifetimeTokens: 30_300_000_000,
+            peakDailyTokens: nil,
+            longestRunningTurnSeconds: nil,
+            currentStreakDays: nil,
+            longestStreakDays: nil,
+            dailyBuckets: [],
+            insights: CodexProfileInsights(
+                fastModePercent: nil,
+                reasoningEffort: nil,
+                reasoningEffortPercent: nil,
+                uniqueSkillsUsed: nil,
+                totalSkillsUsed: nil,
+                totalChats: nil
+            ),
+            invocations: [],
+            fetchedAt: Date(timeIntervalSince1970: 100)
+        )
+        let snapshot = UsageSnapshot(windows: [], profileStats: previous)
+
+        XCTAssertEqual(snapshot.adding(profileStats: nil).profileStats, previous)
     }
 
     func testMultipleWindowsAreClassifiedIndependently() async throws {

@@ -1,0 +1,32 @@
+{
+  "stats": {
+    "lifetime_tokens": 30300000000,
+    "peak_daily_tokens": -1,
+    "longest_running_turn_sec": "unknown",
+    "current_streak_days": 42,
+    "longest_streak_days": null,
+    "daily_usage_buckets": [
+      { "start_date": "2026-08-19", "tokens": -4 }
+    ],
+    "fast_mode_usage_percentage": 130,
+    "most_used_reasoning_effort": "   ",
+    "most_used_reasoning_effort_percentage": -2,
+    "unique_skills_used": -1,
+    "total_skills_used": 8369,
+    "total_threads": 6316,
+    "top_invocations": [
+      {
+        "plugin_id": "bad",
+        "plugin_name": "bad",
+        "type": "plugin",
+        "usage_count": -1
+      },
+      {
+        "plugin_id": "plugin-browser",
+        "plugin_name": "browser",
+        "type": "plugin",
+        "usage_count": 525
+      }
+    ]
+  }
+}

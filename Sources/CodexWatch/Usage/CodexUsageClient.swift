@@ -62,6 +62,7 @@ struct CodexUsageClient {
     static let defaultEndpoint = URL(string: "https://chatgpt.com/backend-api/wham/usage")!
     static let resetCreditsPath = "/backend-api/wham/rate-limit-reset-credits"
     static let analyticsPath = "/backend-api/wham/analytics/daily-workspace-usage-counts"
+    static let profilePath = "/backend-api/wham/profiles/me"
     static let maximumResponseSize = 1_048_576
 
     let credentials: CodexCredentials
@@ -69,18 +70,36 @@ struct CodexUsageClient {
     let endpoint: URL
     let resetCreditsEndpoint: URL
     let analyticsEndpoint: URL
+    let profileEndpoint: URL
 
     init(credentials: CodexCredentials,
          session: URLSession = SecureUsageSession.make(),
          endpoint: URL = CodexUsageClient.defaultEndpoint,
          resetCreditsEndpoint: URL? = nil,
-         analyticsEndpoint: URL? = nil) {
+         analyticsEndpoint: URL? = nil,
+         profileEndpoint: URL? = nil) {
         self.credentials = credentials
         self.session = session
         self.endpoint = endpoint
         self.resetCreditsEndpoint = resetCreditsEndpoint
             ?? endpoint.deletingLastPathComponent().appendingPathComponent("rate-limit-reset-credits")
         self.analyticsEndpoint = analyticsEndpoint ?? Self.defaultAnalyticsEndpoint(from: endpoint)
+        self.profileEndpoint = profileEndpoint ?? Self.defaultProfileEndpoint(from: endpoint)
+    }
+
+    func fetchProfileStats(referenceDate: Date = .now) async throws -> CodexProfileStats {
+        let data = try await fetchData(from: profileEndpoint)
+        do {
+            let response = try JSONDecoder().decode(CodexProfileResponseDTO.self, from: data)
+            guard let profile = response.profileStats(fetchedAt: referenceDate) else {
+                throw CodexUsageError.decodingFailed
+            }
+            return profile
+        } catch let error as CodexUsageError {
+            throw error
+        } catch {
+            throw CodexUsageError.decodingFailed
+        }
     }
 
     func fetchAnalyticsDataset(
@@ -219,6 +238,14 @@ struct CodexUsageClient {
     private static func defaultAnalyticsEndpoint(from endpoint: URL) -> URL {
         var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false)!
         components.path = analyticsPath
+        components.query = nil
+        components.fragment = nil
+        return components.url!
+    }
+
+    private static func defaultProfileEndpoint(from endpoint: URL) -> URL {
+        var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false)!
+        components.path = profilePath
         components.query = nil
         components.fragment = nil
         return components.url!

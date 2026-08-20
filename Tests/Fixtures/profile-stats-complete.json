@@ -1,0 +1,44 @@
+{
+  "profile": {
+    "display_name": "Ignored Profile Identity",
+    "username": "ignored"
+  },
+  "stats": {
+    "lifetime_tokens": 30300000000,
+    "peak_daily_tokens": 1100000000,
+    "longest_running_turn_sec": 56580,
+    "current_streak_days": 42,
+    "longest_streak_days": 82,
+    "daily_usage_buckets": [
+      { "start_date": "2026-08-19", "tokens": 250000000 },
+      { "start_date": "2026-08-18", "tokens": 125000000 }
+    ],
+    "fast_mode_usage_percentage": 7,
+    "most_used_reasoning_effort": "Extra High",
+    "most_used_reasoning_effort_percentage": 60,
+    "unique_skills_used": 82,
+    "total_skills_used": 8369,
+    "total_threads": 6316,
+    "top_invocations": [
+      {
+        "plugin_id": "plugin-browser",
+        "plugin_name": "browser",
+        "skill_id": null,
+        "skill_name": null,
+        "type": "plugin",
+        "usage_count": 525
+      },
+      {
+        "plugin_id": null,
+        "plugin_name": null,
+        "skill_id": "skill-superpowers",
+        "skill_name": "superpowers:brainstorming",
+        "type": "skill",
+        "usage_count": 6122
+      }
+    ]
+  },
+  "metadata": {
+    "stats_error": null
+  }
+}
