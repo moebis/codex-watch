@@ -71,22 +71,14 @@ struct CodexUsageClient {
         calendar: Calendar = .current
     ) async throws -> UsageAnalyticsSummary {
         let periodEnd = calendar.startOfDay(for: referenceDate)
-        guard let periodStart = calendar.date(byAdding: .day, value: -29, to: periodEnd),
-              var components = URLComponents(
-                  url: analyticsEndpoint,
-                  resolvingAgainstBaseURL: false
-              ) else {
+        guard let periodStart = calendar.date(byAdding: .day, value: -29, to: periodEnd) else {
             throw CodexUsageError.invalidHTTPResponse
         }
-        components.queryItems = [
-            URLQueryItem(name: "start_date", value: Self.dateText(periodStart, calendar: calendar)),
-            URLQueryItem(name: "end_date", value: Self.dateText(periodEnd, calendar: calendar)),
-            URLQueryItem(name: "group_by", value: "day"),
-            URLQueryItem(name: "workspace_user", value: "true")
-        ]
-        guard let requestURL = components.url else {
-            throw CodexUsageError.invalidHTTPResponse
-        }
+        let requestURL = try analyticsRequestURL(
+            periodStart: periodStart,
+            periodEnd: periodEnd,
+            calendar: calendar
+        )
 
         let data = try await fetchData(from: requestURL)
         do {
@@ -99,6 +91,38 @@ struct CodexUsageClient {
                 throw CodexUsageError.decodingFailed
             }
             return summary
+        } catch let error as CodexUsageError {
+            throw error
+        } catch {
+            throw CodexUsageError.decodingFailed
+        }
+    }
+
+    func fetchAnalyticsDataset(
+        referenceDate: Date = .now,
+        calendar: Calendar = .current
+    ) async throws -> UsageAnalyticsDataset {
+        let periodEnd = calendar.startOfDay(for: referenceDate)
+        guard let periodStart = calendar.date(byAdding: .day, value: -364, to: periodEnd) else {
+            throw CodexUsageError.invalidHTTPResponse
+        }
+        let requestURL = try analyticsRequestURL(
+            periodStart: periodStart,
+            periodEnd: periodEnd,
+            calendar: calendar
+        )
+
+        let data = try await fetchData(from: requestURL)
+        do {
+            let response = try JSONDecoder().decode(UsageAnalyticsResponseDTO.self, from: data)
+            guard let dataset = response.dataset(
+                requestedStart: periodStart,
+                requestedEnd: periodEnd,
+                calendar: calendar
+            ) else {
+                throw CodexUsageError.decodingFailed
+            }
+            return dataset
         } catch let error as CodexUsageError {
             throw error
         } catch {
@@ -181,6 +205,29 @@ struct CodexUsageClient {
             data.append(byte)
         }
         return data
+    }
+
+    private func analyticsRequestURL(
+        periodStart: Date,
+        periodEnd: Date,
+        calendar: Calendar
+    ) throws -> URL {
+        guard var components = URLComponents(
+            url: analyticsEndpoint,
+            resolvingAgainstBaseURL: false
+        ) else {
+            throw CodexUsageError.invalidHTTPResponse
+        }
+        components.queryItems = [
+            URLQueryItem(name: "start_date", value: Self.dateText(periodStart, calendar: calendar)),
+            URLQueryItem(name: "end_date", value: Self.dateText(periodEnd, calendar: calendar)),
+            URLQueryItem(name: "group_by", value: "day"),
+            URLQueryItem(name: "workspace_user", value: "true")
+        ]
+        guard let requestURL = components.url else {
+            throw CodexUsageError.invalidHTTPResponse
+        }
+        return requestURL
     }
 
     private static func defaultAnalyticsEndpoint(from endpoint: URL) -> URL {

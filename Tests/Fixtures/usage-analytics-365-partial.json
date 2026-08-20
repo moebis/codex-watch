@@ -1,0 +1,70 @@
+{
+  "data": [
+    {
+      "date": "2026-08-18",
+      "totals": {
+        "threads": 1,
+        "turns": 2,
+        "uncached_text_input_tokens": 10,
+        "cached_text_input_tokens": 20,
+        "text_output_tokens": 30,
+        "text_total_tokens": 60
+      },
+      "models": [
+        {
+          "model": "gpt-5.6-sol",
+          "threads": 1,
+          "turns": 2,
+          "credits": 1.25
+        },
+        {
+          "threads": 1,
+          "turns": 1,
+          "credits": 0.5
+        }
+      ],
+      "clients": [
+        {
+          "client_id": "CODEX_DESKTOP_APP",
+          "threads": 1,
+          "turns": 2,
+          "uncached_text_input_tokens": 10,
+          "cached_text_input_tokens": 20,
+          "text_output_tokens": 30,
+          "text_total_tokens": 60
+        }
+      ]
+    },
+    {
+      "date": "2026-08-19",
+      "totals": {
+        "threads": 2,
+        "turns": 3,
+        "uncached_text_input_tokens": 15,
+        "cached_text_input_tokens": 25,
+        "text_output_tokens": 40,
+        "text_total_tokens": 80
+      },
+      "models": [
+        {
+          "model": "gpt-5.6-sol",
+          "threads": 2,
+          "turns": 3,
+          "credits": "2.75"
+        }
+      ],
+      "clients": [
+        {
+          "client_id": "CODEX_DESKTOP_APP",
+          "threads": 2,
+          "turns": 3,
+          "uncached_text_input_tokens": 15,
+          "cached_text_input_tokens": 25,
+          "text_output_tokens": 40,
+          "text_total_tokens": 80
+        }
+      ]
+    }
+  ],
+  "group_by": "day"
+}

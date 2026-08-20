@@ -160,6 +160,39 @@ final class CodexUsageClientTests: XCTestCase {
         XCTAssertEqual(summary.periodEnd, calendar.startOfDay(for: referenceDate))
     }
 
+    func testAnalyticsDatasetRequestUsesTrailingThreeHundredSixtyFiveDays() async throws {
+        let responseData = try Data(contentsOf: fixtureURL("usage-analytics-365-partial.json"))
+        let referenceDate = ISO8601DateFormatter().date(from: "2026-08-20T12:00:00Z")!
+        let calendar = utcCalendar()
+        MockURLProtocol.requestHandler = { request in
+            let query = Dictionary(
+                uniqueKeysWithValues: URLComponents(
+                    url: try XCTUnwrap(request.url),
+                    resolvingAgainstBaseURL: false
+                )?.queryItems?.compactMap { item in
+                    item.value.map { (item.name, $0) }
+                } ?? []
+            )
+            XCTAssertEqual(query["start_date"], "2025-08-21")
+            XCTAssertEqual(query["end_date"], "2026-08-20")
+            XCTAssertEqual(query["group_by"], "day")
+            XCTAssertEqual(query["workspace_user"], "true")
+            XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalCacheData)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-access-token")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "ChatGPT-Account-Id"), "acct_fixture")
+            return (self.response(status: 200, url: request.url), responseData)
+        }
+
+        let dataset = try await makeClient().fetchAnalyticsDataset(
+            referenceDate: referenceDate,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(dataset.requestedStart, day("2025-08-21", calendar: calendar))
+        XCTAssertEqual(dataset.requestedEnd, day("2026-08-20", calendar: calendar))
+        XCTAssertEqual(dataset.days.count, 2)
+    }
+
     func testAnalyticsEndpointOnAnotherHostIsRejectedBeforeSendingCredentials() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockURLProtocol.self]
@@ -496,6 +529,15 @@ final class CodexUsageClientTests: XCTestCase {
         calendar.locale = Locale(identifier: "en_US_POSIX")
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         return calendar
+    }
+
+    private func day(_ text: String, calendar: Calendar) -> Date {
+        let parts = text.split(separator: "-").compactMap { Int($0) }
+        return calendar.date(from: DateComponents(
+            year: parts[0],
+            month: parts[1],
+            day: parts[2]
+        ))!
     }
 
     private func fixtureURL(_ name: String) -> URL {
