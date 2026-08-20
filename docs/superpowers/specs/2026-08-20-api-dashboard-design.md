@@ -144,7 +144,7 @@ Pace is presentation guidance, never an entitlement or allowance estimate.
 - Fixed choices are Manual, 1, 2, 5, 15, and 30 minutes.
 - Adaptive is the default for a new preference domain: 2 minutes when the menu was opened within 5 minutes, 5 minutes within 1 hour, 15 minutes within 4 hours, and 30 minutes otherwise.
 - Low Power Mode or serious/critical thermal pressure selects 30 minutes.
-- Existing installations without a stored preference retain the current 1-minute cadence. No process list or session activity is inspected.
+- The app defaults an unconfigured preference domain to Adaptive. Because 1.0 stored neither a refresh preference nor a launch marker, the local 1.0-to-1.1 upgrade procedure pre-seeds the current 1-minute cadence before replacement when no user choice exists. No process list or session activity is inspected.
 
 The coordinator is testable through injected time and fetch closures. Cancellation, stale generations, and controller shutdown must not publish or retain the controller.
 
