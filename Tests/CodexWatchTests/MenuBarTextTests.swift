@@ -3,6 +3,7 @@ import Foundation
 import XCTest
 @testable import CodexWatch
 
+@MainActor
 final class MenuBarTextTests: XCTestCase {
     func testMenuDoesNotOfferRepositoryUpdateChecks() {
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -38,6 +39,7 @@ final class MenuBarTextTests: XCTestCase {
         let menuTitles = statusItem.menu?.items.map(\.title) ?? []
 
         XCTAssertTrue(menuTitles.contains("Open Usage Analytics…"))
+        XCTAssertTrue(menuTitles.contains("Refresh Frequency"))
         XCTAssertFalse(menuTitles.contains { $0.localizedCaseInsensitiveContains("update") })
         XCTAssertEqual(
             AppIdentity.usageAnalyticsURL.absoluteString,
@@ -45,29 +47,29 @@ final class MenuBarTextTests: XCTestCase {
         )
     }
 
-    func testAnalyticsRefreshPolicyLimitsAutomaticRequestsButAllowsManualRefresh() {
+    func testRefreshPolicyLimitsAutomaticAnalyticsButAllowsManualRefresh() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
 
-        XCTAssertTrue(AnalyticsRefreshPolicy.shouldRefresh(lastAttempt: nil, now: now, manual: false))
+        XCTAssertTrue(RefreshPolicy.shouldIncludeAnalytics(trigger: .automatic, lastAttempt: nil, now: now))
         XCTAssertFalse(
-            AnalyticsRefreshPolicy.shouldRefresh(
+            RefreshPolicy.shouldIncludeAnalytics(
+                trigger: .automatic,
                 lastAttempt: now.addingTimeInterval(-899),
-                now: now,
-                manual: false
+                now: now
             )
         )
         XCTAssertTrue(
-            AnalyticsRefreshPolicy.shouldRefresh(
+            RefreshPolicy.shouldIncludeAnalytics(
+                trigger: .automatic,
                 lastAttempt: now.addingTimeInterval(-900),
-                now: now,
-                manual: false
+                now: now
             )
         )
         XCTAssertTrue(
-            AnalyticsRefreshPolicy.shouldRefresh(
+            RefreshPolicy.shouldIncludeAnalytics(
+                trigger: .manual,
                 lastAttempt: now,
-                now: now,
-                manual: true
+                now: now
             )
         )
     }
@@ -146,12 +148,32 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertEqual(MenuBarText.statusTitle(snapshot: nil), "—")
         XCTAssertEqual(
             MenuBarText.summary(snapshot: nil, error: .signInRequired),
-            "Sign in to ChatGPT to load quota"
+            "Sign in to Codex again"
         )
         XCTAssertEqual(
             MenuBarText.summary(snapshot: nil, error: .quotaUnavailable),
             "Quota unavailable"
         )
+    }
+
+    func testStalePresentationShowsErrorAndLastSuccessfulUpdateTime() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let snapshot = UsageSnapshot(
+            windows: [UsageWindow(id: "weekly", kind: .weekly, usedPercent: 25)],
+            fetchedAt: now.addingTimeInterval(-125)
+        )
+
+        let presentation = QuotaProgressPresentation(
+            snapshot: snapshot,
+            error: .quotaUnavailable,
+            now: now
+        )
+        let values = textValues(in: QuotaProgressMenuView(presentation: presentation))
+
+        XCTAssertEqual(presentation.statusDetail, "Quota unavailable")
+        XCTAssertEqual(presentation.updatedValue, "Updated 2m ago")
+        XCTAssertTrue(values.contains("Quota unavailable"))
+        XCTAssertTrue(values.contains("Updated 2m ago"))
     }
 
     func testResetLineUsesStableEnglishFormatting() {

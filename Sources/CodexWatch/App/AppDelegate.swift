@@ -15,15 +15,32 @@ enum AppIdentity {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarController: MenuBarController?
+    private var wakeObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
-        let controller = MenuBarController()
+        let controller = MenuBarController(
+            refreshFrequency: RefreshFrequency.load(),
+            persistRefreshFrequency: { $0.persist() }
+        )
         menuBarController = controller
         controller.start()
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.menuBarController?.wake()
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        if let wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
+        }
+        wakeObserver = nil
         menuBarController?.stop()
     }
 }

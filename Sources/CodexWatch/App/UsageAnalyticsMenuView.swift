@@ -1,16 +1,6 @@
 import AppKit
 import Foundation
 
-enum AnalyticsRefreshPolicy {
-    static let interval: TimeInterval = 15 * 60
-
-    static func shouldRefresh(lastAttempt: Date?, now: Date, manual: Bool) -> Bool {
-        guard !manual else { return true }
-        guard let lastAttempt else { return true }
-        return now.timeIntervalSince(lastAttempt) >= interval
-    }
-}
-
 struct UsageAnalyticsPresentation: Equatable {
     let title = "Last 30 days"
     let totalTokens: String

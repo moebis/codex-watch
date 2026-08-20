@@ -19,7 +19,7 @@ enum MenuBarButtonStyle {
     }
 }
 
-enum MenuBarErrorState: Equatable {
+enum MenuBarErrorState: Equatable, Sendable {
     case signInRequired
     case quotaUnavailable
 }
@@ -36,7 +36,7 @@ enum MenuBarText {
         }
         switch error {
         case .signInRequired:
-            return "Sign in to ChatGPT to load quota"
+            return "Sign in to Codex again"
         case .quotaUnavailable:
             return "Quota unavailable"
         case nil:
@@ -59,6 +59,14 @@ enum MenuBarText {
               let expiresAt = snapshot?.nextResetCreditExpiry else { return nil }
         let prefix = count == 1 ? "Expires" : "Next expires"
         return "\(prefix): \(resetFormatter.string(from: expiresAt))"
+    }
+
+    static func updatedLine(lastUpdated: Date, now: Date) -> String {
+        let elapsed = max(0, now.timeIntervalSince(lastUpdated))
+        if elapsed < 60 { return "Updated just now" }
+        if elapsed < 60 * 60 { return "Updated \(Int(elapsed / 60))m ago" }
+        if elapsed < 24 * 60 * 60 { return "Updated \(Int(elapsed / 3_600))h ago" }
+        return "Updated \(Int(elapsed / 86_400))d ago"
     }
 
     static func durationText(_ interval: TimeInterval) -> String {
@@ -142,6 +150,8 @@ struct QuotaProgressPresentation: Equatable {
     let resetCreditsDetail: String?
     let resetCreditsProgress: Double?
     let quotaWindows: [QuotaWindowPresentation]
+    let statusDetail: String?
+    let updatedValue: String?
 
     init(snapshot: UsageSnapshot?, error: MenuBarErrorState?, now: Date) {
         planValue = snapshot?.plan?.displayName ?? "Unavailable"
@@ -150,6 +160,10 @@ struct QuotaProgressPresentation: Equatable {
         resetCreditsDetail = MenuBarText.resetCreditExpiryLine(snapshot: snapshot)
         resetCreditsProgress = Self.resetCreditProgress(snapshot: snapshot, now: now)
         quotaWindows = Self.makeQuotaWindows(snapshot: snapshot, now: now)
+        statusDetail = error.map { MenuBarText.summary(snapshot: nil, error: $0) }
+        updatedValue = error.flatMap { _ in
+            snapshot.map { MenuBarText.updatedLine(lastUpdated: $0.fetchedAt, now: now) }
+        }
 
         guard let weekly = snapshot?.weeklyWindow else {
             switch error {
@@ -269,9 +283,13 @@ final class QuotaProgressMenuView: NSView {
             baseHeight = Self.height
         }
         let quotaHeight = Self.extraQuotaHeight(presentation.quotaWindows)
+        let statusHeight = [presentation.statusDetail, presentation.updatedValue]
+            .compactMap { $0 }
+            .reduce(CGFloat.zero) { total, _ in total + 18 }
         let viewHeight = baseHeight
             + (presentation.creditsRemainingValue == nil ? 0 : Self.creditsRemainingHeightIncrement)
             + quotaHeight
+            + statusHeight
         super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: viewHeight))
         translatesAutoresizingMaskIntoConstraints = false
 
@@ -285,6 +303,12 @@ final class QuotaProgressMenuView: NSView {
         add(Self.labelRow(title: "Plan", value: presentation.planValue), to: stack)
         if let creditsRemainingValue = presentation.creditsRemainingValue {
             add(Self.labelRow(title: "Credits remaining", value: creditsRemainingValue), to: stack)
+        }
+        if let statusDetail = presentation.statusDetail {
+            add(Self.detailLabel(statusDetail), to: stack)
+        }
+        if let updatedValue = presentation.updatedValue {
+            add(Self.detailLabel(updatedValue), to: stack)
         }
 
         if presentation.quotaWindows.isEmpty {

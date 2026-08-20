@@ -1,48 +1,61 @@
 import AppKit
 import Foundation
 
-final class MenuBarController: NSObject {
-    static let refreshInterval: TimeInterval = 60
-
+@MainActor
+final class MenuBarController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
     private let authReader: CodexAuthReader
     private let session: URLSession
-    private var refreshTimer: Timer?
-    private var refreshTask: Task<Void, Never>?
+    private let persistRefreshFrequency: (RefreshFrequency) -> Void
+    private var coordinator: RefreshCoordinator!
     private var snapshot: UsageSnapshot?
     private var errorState: MenuBarErrorState?
-    private var lastAnalyticsAttempt: Date?
+    private(set) var analyticsStale = false
 
     init(
         statusItem: NSStatusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength),
         authReader: CodexAuthReader = CodexAuthReader(),
-        session: URLSession = SecureUsageSession.make()
+        session: URLSession = SecureUsageSession.make(),
+        refreshFrequency: RefreshFrequency = .adaptive,
+        persistRefreshFrequency: @escaping (RefreshFrequency) -> Void = { _ in }
     ) {
         self.statusItem = statusItem
         self.authReader = authReader
         self.session = session
+        self.persistRefreshFrequency = persistRefreshFrequency
         super.init()
+        coordinator = RefreshCoordinator(
+            frequency: refreshFrequency,
+            fetch: { [weak self] request in
+                guard let self else {
+                    return RefreshResult(snapshot: nil, error: nil, analyticsStale: false)
+                }
+                return await self.fetch(request: request)
+            },
+            publish: { [weak self] result in
+                self?.apply(result: result)
+            }
+        )
     }
 
     func start() {
         configureStatusButton()
         rebuildMenu()
-        refresh(manual: true)
-        refreshTimer = Timer.scheduledTimer(
-            withTimeInterval: Self.refreshInterval,
-            repeats: true
-        ) { [weak self] _ in
-            self?.refresh(manual: false)
-        }
+        coordinator.trigger(.manual)
     }
 
     func stop() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
-        refreshTask?.cancel()
-        refreshTask = nil
+        coordinator.stop()
         session.invalidateAndCancel()
         NSStatusBar.system.removeStatusItem(statusItem)
+    }
+
+    func wake() {
+        coordinator.trigger(.wake)
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        coordinator.trigger(.menuOpened)
     }
 
     private func configureStatusButton() {
@@ -52,72 +65,86 @@ final class MenuBarController: NSObject {
     }
 
     @objc private func refreshNow() {
-        refresh(manual: true)
+        coordinator.trigger(.manual)
     }
 
-    private func refresh(manual: Bool) {
-        refreshTask?.cancel()
-        let reader = authReader
-        let session = self.session
-        let now = Date.now
-        let shouldFetchAnalytics = AnalyticsRefreshPolicy.shouldRefresh(
-            lastAttempt: lastAnalyticsAttempt,
-            now: now,
-            manual: manual
-        )
-        if shouldFetchAnalytics {
-            lastAnalyticsAttempt = now
-        }
-        let previousAnalyticsDataset = snapshot?.analyticsDataset
-        refreshTask = Task { [weak self] in
-            do {
-                let credentials = try reader.read()
-                let client = CodexUsageClient(
-                    credentials: credentials,
-                    session: session
-                )
-                let quotaSnapshot = try await client.fetch()
-                let analyticsDataset = shouldFetchAnalytics
-                    ? try? await client.fetchAnalyticsDataset(referenceDate: now)
-                    : previousAnalyticsDataset
-                let value = quotaSnapshot.adding(
-                    analyticsDataset: analyticsDataset ?? previousAnalyticsDataset
-                )
-                guard !Task.isCancelled else { return }
-                await MainActor.run { [weak self] in
-                    self?.apply(snapshot: value)
-                }
-            } catch let error as CodexAuthError {
-                guard !Task.isCancelled else { return }
-                await MainActor.run { [weak self] in
-                    self?.apply(error: error == .authFileUnavailable ? .signInRequired : .quotaUnavailable)
-                }
-            } catch {
-                guard !Task.isCancelled else { return }
-                await MainActor.run { [weak self] in
-                    self?.apply(error: .quotaUnavailable)
+    @objc private func setRefreshFrequency(_ sender: NSMenuItem) {
+        guard let rawValue = (sender.representedObject as? NSNumber)?.intValue,
+              let frequency = RefreshFrequency(rawValue: rawValue) else { return }
+        persistRefreshFrequency(frequency)
+        coordinator.setFrequency(frequency)
+        rebuildMenu()
+    }
+
+    private func fetch(request: RefreshRequest) async -> RefreshResult {
+        do {
+            let credentials = try authReader.read()
+            let client = CodexUsageClient(credentials: credentials, session: session)
+            let quotaSnapshot = try await client.fetch()
+            let previousAnalyticsDataset = snapshot?.analyticsDataset
+            var analyticsDataset = previousAnalyticsDataset
+            var nextAnalyticsStale = analyticsStale
+
+            if request.includeAnalytics {
+                do {
+                    analyticsDataset = try await client.fetchAnalyticsDataset(
+                        referenceDate: request.requestedAt
+                    )
+                    nextAnalyticsStale = false
+                } catch {
+                    nextAnalyticsStale = previousAnalyticsDataset != nil
                 }
             }
+
+            return RefreshResult(
+                snapshot: quotaSnapshot.adding(analyticsDataset: analyticsDataset),
+                error: nil,
+                analyticsStale: nextAnalyticsStale
+            )
+        } catch is CodexAuthError {
+            return RefreshResult(
+                snapshot: nil,
+                error: .signInRequired,
+                analyticsStale: analyticsStale
+            )
+        } catch CodexUsageError.reauthenticationRequired {
+            return RefreshResult(
+                snapshot: nil,
+                error: .signInRequired,
+                analyticsStale: analyticsStale
+            )
+        } catch {
+            return RefreshResult(
+                snapshot: nil,
+                error: .quotaUnavailable,
+                analyticsStale: analyticsStale
+            )
         }
     }
 
-    private func apply(snapshot: UsageSnapshot) {
-        self.snapshot = snapshot
-        errorState = nil
-        statusItem.button?.title = MenuBarText.statusTitle(snapshot: snapshot)
+    private func apply(result: RefreshResult) {
+        analyticsStale = result.analyticsStale
+        if let value = result.snapshot {
+            snapshot = value
+            errorState = nil
+        } else if let error = result.error {
+            errorState = error
+        }
+        updateStatusButton()
         rebuildMenu()
     }
 
-    private func apply(error: MenuBarErrorState) {
-        errorState = error
-        if snapshot == nil {
-            statusItem.button?.title = MenuBarText.statusTitle(snapshot: nil)
-        }
-        rebuildMenu()
+    private func updateStatusButton() {
+        guard let button = statusItem.button else { return }
+        button.title = MenuBarText.statusTitle(snapshot: snapshot)
+        let isStale = errorState != nil && snapshot != nil
+        button.alphaValue = isStale ? 0.62 : 1
+        button.contentTintColor = isStale ? .secondaryLabelColor : .labelColor
     }
 
     private func rebuildMenu() {
         let menu = NSMenu()
+        menu.delegate = self
         let progressItem = NSMenuItem()
         progressItem.view = QuotaProgressMenuView(
             presentation: QuotaProgressPresentation(
@@ -144,6 +171,7 @@ final class MenuBarController: NSObject {
 
         menu.addItem(.separator())
         menu.addItem(actionItem(title: "Refresh Now", action: #selector(refreshNow), keyEquivalent: "r"))
+        menu.addItem(refreshFrequencyItem())
         menu.addItem(actionItem(title: "Open ChatGPT", action: #selector(openChatGPT), keyEquivalent: "o"))
         menu.addItem(
             actionItem(
@@ -159,6 +187,33 @@ final class MenuBarController: NSObject {
         menu.addItem(.separator())
         menu.addItem(actionItem(title: "Quit Codex Watch", action: #selector(quit), keyEquivalent: "q"))
         statusItem.menu = menu
+    }
+
+    private func refreshFrequencyItem() -> NSMenuItem {
+        let parent = NSMenuItem(title: "Refresh Frequency", action: nil, keyEquivalent: "")
+        let submenu = NSMenu(title: "Refresh Frequency")
+        let order: [RefreshFrequency] = [
+            .adaptive,
+            .manual,
+            .oneMinute,
+            .twoMinutes,
+            .fiveMinutes,
+            .fifteenMinutes,
+            .thirtyMinutes
+        ]
+        for frequency in order {
+            let item = NSMenuItem(
+                title: frequency.displayName,
+                action: #selector(setRefreshFrequency),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = NSNumber(value: frequency.rawValue)
+            item.state = coordinator.frequency == frequency ? .on : .off
+            submenu.addItem(item)
+        }
+        parent.submenu = submenu
+        return parent
     }
 
     private func actionItem(title: String, action: Selector, keyEquivalent: String) -> NSMenuItem {
