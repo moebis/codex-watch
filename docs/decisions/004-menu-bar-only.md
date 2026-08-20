@@ -1,8 +1,8 @@
 ---
-status: active
+status: superseded
 contract_ids: [MENU-BAR-001, PRIVACY-BOUNDARY-003]
 supersedes: [001-fixed-canvas-notch-motion, 002-native-liquid-glass-with-fallback, 003-abandon-cross-window-liquid-glass]
-superseded_by: null
+superseded_by: 008-api-dashboard-and-refresh
 owner: project-maintainer
 created_at: 2026-07-19
 last_verified_commit: 23b1418
@@ -30,3 +30,5 @@ The previous implementation used a transparent panel around the physical notch a
 ## Consequences
 
 The app works on every supported Mac with a smaller executable and narrower data access. The menu bar appearance still requires a real macOS visual check. Historical notch decisions remain available in Git history.
+
+This decision was superseded by [008-api-dashboard-and-refresh](008-api-dashboard-and-refresh.md), which preserves the persistent menu-bar surface and privacy boundary while allowing one user-opened native analytics window.

@@ -1,5 +1,7 @@
 # Codex Watch 1.0 Design
 
+> Historical release design. Codex Watch 1.1 supersedes the analytics and surface decisions here; see the [Codex Watch 1.1 API Dashboard Design](../superpowers/specs/2026-08-20-api-dashboard-design.md). The 1.0 record remains unchanged below as release history.
+
 ## Goal
 
 Rename CodexNotch to Codex Watch, give it an original app icon, and add truthful 30-day token-usage details without expanding the app into a browser, telemetry collector, or conversation-log reader.

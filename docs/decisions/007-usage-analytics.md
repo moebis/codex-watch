@@ -1,8 +1,8 @@
 ---
-status: active
+status: superseded
 contract_ids: [PRIVACY-BOUNDARY-003, USAGE-ANALYTICS-010]
 supersedes: []
-superseded_by: null
+superseded_by: 008-api-dashboard-and-refresh
 owner: project-maintainer
 created_at: 2026-08-20
 last_verified_commit: pending
@@ -33,3 +33,5 @@ The quota response reports remaining rate-limit percentages but not recent absol
 ## Consequences
 
 Codex Watch makes one additional same-host request at most every 15 minutes while running, plus explicit manual refreshes. The route is not a documented public API, so the menu must continue to fail closed and preserve quota behavior if it changes.
+
+This decision was superseded by [008-api-dashboard-and-refresh](008-api-dashboard-and-refresh.md), which expands the bounded request to 365 days and defines the native projections, activity-only state, CSV export, and coordinated refresh behavior.

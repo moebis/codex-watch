@@ -1,7 +1,7 @@
 contracts:
   - id: MENU-BAR-001
     title: The quota is presented only in the macOS menu bar
-    status: active
+    status: superseded
     statement: The app displays a system icon and the rounded remaining weekly percentage in one variable-length NSStatusItem. The icon hugs the title so both are centered as one compact unit, while the status item retains native macOS outer spacing and click behavior. It creates no notch overlay, floating panel, Dock icon, or ordinary app window.
     rationale: Native compact image-title layout matches surrounding menu bar items without fragile negative spacing or a reduced click target, and avoids screen geometry, pointer interception, and overlay privacy risks.
     source: user-confirmed
@@ -17,8 +17,8 @@ contracts:
       - Tests/CodexWatchTests/MenuBarTextTests.swift
       - "manual: inspect icon and percentage spacing on a real Mac"
     supersedes: []
-    superseded_by: null
-    last_verified_commit: 23b1418
+    superseded_by: DASHBOARD-SURFACE-011
+    last_verified_commit: pending
 
   - id: QUOTA-SEMANTICS-002
     title: The displayed number is the remaining weekly percentage
@@ -45,7 +45,7 @@ contracts:
   - id: PRIVACY-BOUNDARY-003
     title: Credentials and private Codex data remain minimally exposed
     status: active
-    statement: The app reads only the bounded local auth file, keeps credentials in process memory, sends them only over HTTPS to the original ChatGPT usage host, and limits each response to one mebibyte before decoding. It never contacts an update service, scans sessions, reads prompts, logs sensitive data, caches responses, or stores cookies.
+    statement: The app reads only the bounded local auth file, keeps credentials and authenticated responses in process memory, sends credentials only over HTTPS to the original ChatGPT usage host, and limits each response to one mebibyte before decoding. It never contacts an update service, scans sessions, reads prompts, logs sensitive data, caches responses, or stores cookies. Analytics leaves process memory only when the user explicitly chooses a CSV destination, and only the selected validated projection is written.
     rationale: The app handles an access token and must minimize both data access and exfiltration paths.
     source: security-review
     owner: project-maintainer
@@ -54,11 +54,12 @@ contracts:
       include: [auth-reader, usage-client, network-session]
       exclude: [conversation-monitoring, telemetry, automatic-download, automatic-install]
     examples:
-      positive: Ephemeral bounded GET requests obtain usage and reset-credit details, and no response body is persisted.
-      negative: A rollout JSONL file is parsed or an authenticated redirect is followed to another host.
+      positive: Ephemeral bounded GET requests obtain usage, reset-credit, and 365-day analytics details; a CSV is written only after the user confirms a save destination.
+      negative: A rollout JSONL file is parsed, an authenticated redirect is followed to another host, or analytics is cached automatically on disk.
     guards:
       - Tests/CodexWatchTests/CodexAuthReaderTests.swift
       - Tests/CodexWatchTests/CodexUsageClientTests.swift
+      - Tests/CodexWatchTests/UsageAnalyticsCSVExporterTests.swift
       - "manual: sensitive string and executable dependency review"
     supersedes: []
     superseded_by: null
@@ -177,7 +178,7 @@ contracts:
 
   - id: USAGE-ANALYTICS-010
     title: The menu shows only bounded server-reported aggregate usage
-    status: active
+    status: superseded
     statement: Codex Watch may request the inclusive trailing 30 calendar days of daily aggregate usage from the authenticated ChatGPT HTTPS host and display the summed total, uncached-input, cached-input, and output tokens plus turns and threads. The app accepts only day-grouped rows with valid unique dates inside the requested interval and complete nonnegative non-overflowing totals, keeps the result only in process memory, refreshes it at launch and on manual refresh but no more than once every 15 minutes automatically, and preserves weekly quota plus any prior in-memory aggregate when the analytics request fails. It never scans local sessions, reads prompts, scrapes HTML, or fabricates lifetime totals, streaks, or profile statistics.
     rationale: Server aggregates provide useful absolute usage detail without exposing conversation content, while bounded decoding and best-effort refresh preserve the app's narrow privacy and reliability boundary.
     source: user-confirmed-and-observed-official-product
@@ -193,6 +194,74 @@ contracts:
       - Tests/CodexWatchTests/CodexUsageClientTests.swift
       - Tests/CodexWatchTests/MenuBarTextTests.swift
       - "manual: compare the 30-day rows with the official Codex Usage Analytics page"
+    supersedes: []
+    superseded_by: USAGE-ANALYTICS-012
+    last_verified_commit: pending
+
+  - id: DASHBOARD-SURFACE-011
+    title: The menu bar remains persistent with one on-demand native analytics window
+    status: active
+    statement: Codex Watch remains an LSUIElement app whose persistent control surface is one native NSStatusItem showing the rounded base-weekly percentage. The status menu may open one reusable 940 by 720 resizable native analytics window with 7, 30, 90, and 365 day ranges, but the app creates no notch overlay, hidden web view, persistent Dock icon, or duplicate analytics window.
+    rationale: A native on-demand window provides enough space for truthful charts, coverage, and model/client tables without returning to screen overlays or embedding browser state.
+    source: user-confirmed
+    owner: project-maintainer
+    risk: medium
+    scope:
+      include: [menu-bar, status-menu, analytics-window, accessibility]
+      exclude: [notch-overlay, webview, persistent-dock-icon, session-state]
+    examples:
+      positive: Open Analytics Dashboard reuses the existing native window and the menu bar continues to show the unchanged weekly percentage.
+      negative: Selecting the action creates another window each time, adds a persistent Dock icon, or replaces the weekly percentage with a model-specific limit.
+    guards:
+      - Tests/CodexWatchTests/MenuBarTextTests.swift
+      - Tests/CodexWatchTests/AnalyticsDashboardModelTests.swift
+      - "manual: reopen and resize the analytics window while inspecting the menu bar on a real Mac"
+    supersedes: [MENU-BAR-001]
+    superseded_by: null
+    last_verified_commit: pending
+
+  - id: USAGE-ANALYTICS-012
+    title: One bounded server dataset powers truthful Codex analytics projections
+    status: active
+    statement: Codex Watch requests at most the inclusive trailing 365 calendar days of day-grouped aggregate usage from the authenticated ChatGPT HTTPS host, validates it into an in-memory dataset, and derives 7, 30, 90, and 365 day projections without additional range requests. Token totals aggregate only rows with complete nonnegative token fields. Rows that contain valid turns and threads but omit every token field remain explicitly activity-only, distinct from observed zero-token and missing dates. Model rows report activity and credits, client rows report tokens, comparisons require at least 90 percent token coverage in both periods, and 365 day comparison is unavailable. A user-requested CSV exports only the selected validated projection.
+    rationale: The wider bounded response supplies useful Codex metrics while explicit coverage and activity-only states prevent historical schema differences from becoming fabricated token usage.
+    source: user-confirmed-and-live-verified
+    owner: project-maintainer
+    risk: high
+    scope:
+      include: [usage-analytics, projection, dashboard, status-menu, csv-export]
+      exclude: [session-scanning, lifetime-inference, model-token-inference, pricing, html-scraping]
+    examples:
+      positive: A day with turns and threads but no token keys contributes to activity totals, exports as Activity only with blank token cells, and does not count toward token coverage.
+      negative: Missing token fields are converted to zero, model credits are labeled as tokens, or a 30 day total is fetched with a separate authenticated request.
+    guards:
+      - Tests/CodexWatchTests/UsageAnalyticsDatasetTests.swift
+      - Tests/CodexWatchTests/UsageAnalyticsProjectionTests.swift
+      - Tests/CodexWatchTests/AnalyticsDashboardModelTests.swift
+      - Tests/CodexWatchTests/UsageAnalyticsCSVExporterTests.swift
+      - "manual: compare dashboard ranges and data-through labels with the official Codex analytics page"
+    supersedes: [USAGE-ANALYTICS-010]
+    superseded_by: null
+    last_verified_commit: pending
+
+  - id: REFRESH-COORDINATION-013
+    title: Refresh work is coordinated, bounded, and user-selectable
+    status: active
+    statement: A single coordinator owns automatic, manual, menu-open, and wake refresh triggers. Repeated automatic triggers coalesce into active work; manual refresh replaces older work and only the newest generation may publish; scheduled delays start after completion; shutdown prevents publication. Fixed choices are Manual, 1, 2, 5, 15, and 30 minutes. Adaptive is the fresh-install default, ranges from 2 to 30 minutes based only on menu interaction, and uses 30 minutes during Low Power Mode or serious thermal pressure. Menu opening refreshes quota only when the last success is older than 60 seconds, and automatic analytics attempts remain at least 15 minutes apart.
+    rationale: Generation ownership prevents cancellation churn and stale publication while explicit and adaptive choices control freshness without scanning processes, sessions, or user content.
+    source: user-confirmed
+    owner: project-maintainer
+    risk: high
+    scope:
+      include: [refresh-coordinator, preferences, stale-state, wake-handling]
+      exclude: [process-scanning, session-scanning, notifications, token-refresh]
+    examples:
+      positive: Two automatic triggers share one fetch, while a later manual trigger replaces it and is the only generation allowed to update the menu and dashboard.
+      negative: A repeating timer cancels a request every minute, a stale generation publishes after manual refresh, or adaptive cadence inspects running Codex processes.
+    guards:
+      - Tests/CodexWatchTests/RefreshCoordinatorTests.swift
+      - Tests/CodexWatchTests/MenuBarTextTests.swift
+      - "manual: exercise every refresh-frequency choice and wake behavior on a real Mac"
     supersedes: []
     superseded_by: null
     last_verified_commit: pending
