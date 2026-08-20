@@ -28,138 +28,6 @@ final class CodexUsageClientTests: XCTestCase {
         XCTAssertEqual(snapshot.availableResetCredits, 2)
     }
 
-    func testAnalyticsResponseAggregatesCompleteNonnegativeDailyTotals() throws {
-        let responseData = try Data(contentsOf: fixtureURL("usage-analytics-30-day.json"))
-        let calendar = utcCalendar()
-        let periodStart = calendar.date(from: DateComponents(year: 2026, month: 7, day: 22))!
-        let periodEnd = calendar.date(from: DateComponents(year: 2026, month: 8, day: 20))!
-        let fetchedAt = Date(timeIntervalSince1970: 1_779_153_600)
-
-        let summary = try XCTUnwrap(
-            JSONDecoder().decode(UsageAnalyticsResponseDTO.self, from: responseData).summary(
-                periodStart: periodStart,
-                periodEnd: periodEnd,
-                calendar: calendar,
-                fetchedAt: fetchedAt
-            )
-        )
-
-        XCTAssertEqual(summary.periodStart, periodStart)
-        XCTAssertEqual(summary.periodEnd, periodEnd)
-        XCTAssertEqual(summary.totalTokens, 14_000)
-        XCTAssertEqual(summary.uncachedInputTokens, 2_500)
-        XCTAssertEqual(summary.cachedInputTokens, 4_500)
-        XCTAssertEqual(summary.outputTokens, 7_000)
-        XCTAssertEqual(summary.turns, 22)
-        XCTAssertEqual(summary.chats, 5)
-        XCTAssertEqual(summary.fetchedAt, fetchedAt)
-    }
-
-    func testAnalyticsResponseRejectsWrongGroupingOutOfRangeDuplicateOrMalformedDates() throws {
-        let calendar = utcCalendar()
-        let periodStart = calendar.date(from: DateComponents(year: 2026, month: 7, day: 22))!
-        let periodEnd = calendar.date(from: DateComponents(year: 2026, month: 8, day: 20))!
-        let totals = #"{"threads":1,"turns":2,"uncached_text_input_tokens":3,"cached_text_input_tokens":4,"text_output_tokens":5,"text_total_tokens":12}"#
-        let invalidResponses = [
-            #"{"group_by":"week","data":[{"date":"2026-08-20","totals":\#(totals)}]}"#,
-            #"{"group_by":"day","data":[{"date":"2026-07-21","totals":\#(totals)}]}"#,
-            #"{"group_by":"day","data":[{"date":"2026-08-20","totals":\#(totals)},{"date":"2026-08-20","totals":\#(totals)}]}"#,
-            #"{"group_by":"day","data":[{"date":"2026-8-20","totals":\#(totals)}]}"#
-        ]
-
-        for json in invalidResponses {
-            let response = try JSONDecoder().decode(
-                UsageAnalyticsResponseDTO.self,
-                from: Data(json.utf8)
-            )
-
-            XCTAssertNil(
-                response.summary(
-                    periodStart: periodStart,
-                    periodEnd: periodEnd,
-                    calendar: calendar
-                )
-            )
-        }
-    }
-
-    func testAnalyticsResponseRejectsAggregateOverflow() throws {
-        let calendar = utcCalendar()
-        let response = try JSONDecoder().decode(
-            UsageAnalyticsResponseDTO.self,
-            from: Data(
-                #"{"group_by":"day","data":[{"date":"2026-08-19","totals":{"threads":1,"turns":1,"uncached_text_input_tokens":1,"cached_text_input_tokens":1,"text_output_tokens":1,"text_total_tokens":9223372036854775807}},{"date":"2026-08-20","totals":{"threads":1,"turns":1,"uncached_text_input_tokens":1,"cached_text_input_tokens":1,"text_output_tokens":1,"text_total_tokens":1}}]}"#.utf8
-            )
-        )
-
-        XCTAssertNil(
-            response.summary(
-                periodStart: calendar.date(from: DateComponents(year: 2026, month: 7, day: 22))!,
-                periodEnd: calendar.date(from: DateComponents(year: 2026, month: 8, day: 20))!,
-                calendar: calendar
-            )
-        )
-    }
-
-    func testAnalyticsResponseRejectsNegativeOrIncompleteDailyTotals() throws {
-        for json in [
-            #"{"data":[{"date":"2026-08-20","totals":{"threads":1,"turns":2,"uncached_text_input_tokens":3,"cached_text_input_tokens":4,"text_output_tokens":5,"text_total_tokens":-1}}]}"#,
-            #"{"data":[{"date":"2026-08-20","totals":{"threads":1,"turns":2,"cached_text_input_tokens":4,"text_output_tokens":5,"text_total_tokens":9}}]}"#,
-            #"{"data":[]}"#
-        ] {
-            let response = try JSONDecoder().decode(
-                UsageAnalyticsResponseDTO.self,
-                from: Data(json.utf8)
-            )
-
-            XCTAssertNil(
-                response.summary(
-                    periodStart: Date(timeIntervalSince1970: 1_776_643_200),
-                    periodEnd: Date(timeIntervalSince1970: 1_779_148_800),
-                    fetchedAt: Date(timeIntervalSince1970: 1_779_153_600)
-                )
-            )
-        }
-    }
-
-    func testAnalyticsRequestUsesTrailingThirtyDaysAndExistingCredentialBoundary() async throws {
-        let responseData = try Data(contentsOf: fixtureURL("usage-analytics-30-day.json"))
-        let referenceDate = ISO8601DateFormatter().date(from: "2026-08-20T12:00:00Z")!
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        MockURLProtocol.requestHandler = { request in
-            XCTAssertEqual(
-                request.url?.path,
-                "/backend-api/wham/analytics/daily-workspace-usage-counts"
-            )
-            let query = Dictionary(
-                uniqueKeysWithValues: URLComponents(
-                    url: try XCTUnwrap(request.url),
-                    resolvingAgainstBaseURL: false
-                )?.queryItems?.compactMap { item in
-                    item.value.map { (item.name, $0) }
-                } ?? []
-            )
-            XCTAssertEqual(query["start_date"], "2026-07-22")
-            XCTAssertEqual(query["end_date"], "2026-08-20")
-            XCTAssertEqual(query["group_by"], "day")
-            XCTAssertEqual(query["workspace_user"], "true")
-            XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalCacheData)
-            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-access-token")
-            XCTAssertEqual(request.value(forHTTPHeaderField: "ChatGPT-Account-Id"), "acct_fixture")
-            return (self.response(status: 200, url: request.url), responseData)
-        }
-
-        let summary = try await makeClient().fetchAnalytics(
-            referenceDate: referenceDate,
-            calendar: calendar
-        )
-
-        XCTAssertEqual(summary.totalTokens, 14_000)
-        XCTAssertEqual(summary.periodStart, calendar.startOfDay(for: referenceDate).addingTimeInterval(-29 * 86_400))
-        XCTAssertEqual(summary.periodEnd, calendar.startOfDay(for: referenceDate))
-    }
-
     func testAnalyticsDatasetRequestUsesTrailingThreeHundredSixtyFiveDays() async throws {
         let responseData = try Data(contentsOf: fixtureURL("usage-analytics-365-partial.json"))
         let referenceDate = ISO8601DateFormatter().date(from: "2026-08-20T12:00:00Z")!
@@ -208,7 +76,7 @@ final class CodexUsageClientTests: XCTestCase {
         )
 
         do {
-            _ = try await client.fetchAnalytics()
+            _ = try await client.fetchAnalyticsDataset()
             XCTFail("Expected an invalid response error")
         } catch let error as CodexUsageError {
             XCTAssertEqual(error, .invalidHTTPResponse)
@@ -222,28 +90,27 @@ final class CodexUsageClientTests: XCTestCase {
         }
 
         do {
-            _ = try await makeClient().fetchAnalytics()
+            _ = try await makeClient().fetchAnalyticsDataset()
             XCTFail("Expected an oversized response error")
         } catch let error as URLError {
             XCTAssertEqual(error.code, .dataLengthExceedsMaximum)
         }
     }
 
-    func testMissingNewAnalyticsPreservesLastSuccessfulInMemorySummary() {
-        let previous = UsageAnalyticsSummary(
-            periodStart: Date(timeIntervalSince1970: 1_776_643_200),
-            periodEnd: Date(timeIntervalSince1970: 1_779_148_800),
-            totalTokens: 14_000,
-            uncachedInputTokens: 2_500,
-            cachedInputTokens: 4_500,
-            outputTokens: 7_000,
-            turns: 22,
-            chats: 5,
-            fetchedAt: Date(timeIntervalSince1970: 1_779_153_600)
+    func testMissingNewAnalyticsPreservesLastSuccessfulInMemoryDataset() {
+        let calendar = utcCalendar()
+        let end = day("2026-08-20", calendar: calendar)
+        let previous = UsageAnalyticsDataset(
+            requestedStart: day("2025-08-21", calendar: calendar),
+            requestedEnd: end,
+            days: [],
+            fetchedAt: end,
+            modelBreakdownIsPartial: false,
+            clientBreakdownIsPartial: false
         )
-        let snapshot = UsageSnapshot(windows: [], analytics: previous)
+        let snapshot = UsageSnapshot(windows: [], analyticsDataset: previous)
 
-        XCTAssertEqual(snapshot.adding(analytics: nil).analytics, previous)
+        XCTAssertEqual(snapshot.adding(analyticsDataset: nil).analyticsDataset, previous)
     }
 
     func testMultipleWindowsAreClassifiedIndependently() async throws {

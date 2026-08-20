@@ -86,7 +86,7 @@ final class MenuBarController: NSObject {
         if shouldFetchAnalytics {
             lastAnalyticsAttempt = now
         }
-        let previousAnalytics = snapshot?.analytics
+        let previousAnalyticsDataset = snapshot?.analyticsDataset
         refreshTask = Task { [weak self] in
             do {
                 let credentials = try reader.read()
@@ -95,10 +95,12 @@ final class MenuBarController: NSObject {
                     session: session
                 )
                 let quotaSnapshot = try await client.fetch()
-                let analytics = shouldFetchAnalytics
-                    ? try? await client.fetchAnalytics(referenceDate: now)
-                    : previousAnalytics
-                let value = quotaSnapshot.adding(analytics: analytics ?? previousAnalytics)
+                let analyticsDataset = shouldFetchAnalytics
+                    ? try? await client.fetchAnalyticsDataset(referenceDate: now)
+                    : previousAnalyticsDataset
+                let value = quotaSnapshot.adding(
+                    analyticsDataset: analyticsDataset ?? previousAnalyticsDataset
+                )
                 guard !Task.isCancelled else { return }
                 await MainActor.run { [weak self] in
                     self?.apply(snapshot: value)
@@ -144,11 +146,16 @@ final class MenuBarController: NSObject {
         )
         menu.addItem(progressItem)
 
-        if let analytics = snapshot?.analytics {
+        if let dataset = snapshot?.analyticsDataset,
+           let projection = UsageAnalyticsProjection.make(
+               dataset: dataset,
+               range: .days30,
+               referenceDate: .now
+           ) {
             menu.addItem(.separator())
             let analyticsItem = NSMenuItem()
             analyticsItem.view = UsageAnalyticsMenuView(
-                presentation: UsageAnalyticsPresentation(summary: analytics)
+                presentation: UsageAnalyticsPresentation(projection: projection)
             )
             menu.addItem(analyticsItem)
         }

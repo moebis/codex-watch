@@ -73,19 +73,16 @@ final class MenuBarTextTests: XCTestCase {
     }
 
     func testUsageAnalyticsPresentationFormatsSixTruthfulThirtyDayMetrics() {
-        let summary = UsageAnalyticsSummary(
-            periodStart: Date(timeIntervalSince1970: 1_776_643_200),
-            periodEnd: Date(timeIntervalSince1970: 1_779_148_800),
+        let projection = makeAnalyticsProjection(
             totalTokens: 30_300_000_000,
-            uncachedInputTokens: 1_200_000,
+            inputTokens: 1_200_000,
             cachedInputTokens: 999,
             outputTokens: 2_345,
             turns: 3_427,
-            chats: 42,
-            fetchedAt: Date(timeIntervalSince1970: 1_779_153_600)
+            chats: 42
         )
 
-        let presentation = UsageAnalyticsPresentation(summary: summary)
+        let presentation = UsageAnalyticsPresentation(projection: projection)
 
         XCTAssertEqual(presentation.title, "Last 30 days")
         XCTAssertEqual(presentation.totalTokens, "30.3B")
@@ -94,23 +91,22 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertEqual(presentation.outputTokens, "2.3K")
         XCTAssertEqual(presentation.turns, "3.4K")
         XCTAssertEqual(presentation.chats, "42")
+        XCTAssertEqual(presentation.coverage, "1/30 days")
+        XCTAssertFalse(presentation.dataThrough.isEmpty)
     }
 
     func testUsageAnalyticsMenuContainsSixLabeledRows() {
-        let summary = UsageAnalyticsSummary(
-            periodStart: Date(timeIntervalSince1970: 1_776_643_200),
-            periodEnd: Date(timeIntervalSince1970: 1_779_148_800),
-            totalTokens: 14_000,
-            uncachedInputTokens: 2_500,
-            cachedInputTokens: 4_500,
-            outputTokens: 7_000,
-            turns: 22,
-            chats: 5,
-            fetchedAt: Date(timeIntervalSince1970: 1_779_153_600)
-        )
-
         let view = UsageAnalyticsMenuView(
-            presentation: UsageAnalyticsPresentation(summary: summary)
+            presentation: UsageAnalyticsPresentation(
+                projection: makeAnalyticsProjection(
+                    totalTokens: 14_000,
+                    inputTokens: 2_500,
+                    cachedInputTokens: 4_500,
+                    outputTokens: 7_000,
+                    turns: 22,
+                    chats: 5
+                )
+            )
         )
         let values = textValues(in: view)
 
@@ -121,6 +117,8 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertTrue(values.contains("Output tokens"))
         XCTAssertTrue(values.contains("Turns"))
         XCTAssertTrue(values.contains("Chats"))
+        XCTAssertTrue(values.contains("Coverage"))
+        XCTAssertTrue(values.contains("Data through"))
         XCTAssertEqual(view.frame.width, UsageAnalyticsMenuView.width)
     }
 
@@ -457,6 +455,47 @@ final class MenuBarTextTests: XCTestCase {
         view.subviews.flatMap { child in
             (child as? NSProgressIndicator).map { [$0] } ?? progressIndicators(in: child)
         }
+    }
+
+    private func makeAnalyticsProjection(
+        totalTokens: Int64,
+        inputTokens: Int64,
+        cachedInputTokens: Int64,
+        outputTokens: Int64,
+        turns: Int64,
+        chats: Int64
+    ) -> UsageAnalyticsProjection {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let end = calendar.date(from: DateComponents(year: 2026, month: 8, day: 20))!
+        let start = calendar.date(byAdding: .day, value: -364, to: end)!
+        let day = UsageAnalyticsDay(
+            date: end,
+            totals: UsageTokenTotals(
+                totalTokens: totalTokens,
+                uncachedInputTokens: inputTokens,
+                cachedInputTokens: cachedInputTokens,
+                outputTokens: outputTokens,
+                turns: turns,
+                chats: chats
+            ),
+            models: [],
+            clients: []
+        )
+        let dataset = UsageAnalyticsDataset(
+            requestedStart: start,
+            requestedEnd: end,
+            days: [day],
+            fetchedAt: end,
+            modelBreakdownIsPartial: false,
+            clientBreakdownIsPartial: false
+        )
+        return UsageAnalyticsProjection.make(
+            dataset: dataset,
+            range: .days30,
+            referenceDate: end,
+            calendar: calendar
+        )!
     }
 
     private func textValues(in view: NSView) -> [String] {

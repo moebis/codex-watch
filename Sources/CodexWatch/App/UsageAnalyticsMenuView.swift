@@ -19,14 +19,18 @@ struct UsageAnalyticsPresentation: Equatable {
     let outputTokens: String
     let turns: String
     let chats: String
+    let coverage: String
+    let dataThrough: String
 
-    init(summary: UsageAnalyticsSummary) {
-        totalTokens = Self.compact(summary.totalTokens)
-        inputTokens = Self.compact(summary.uncachedInputTokens)
-        cachedInputTokens = Self.compact(summary.cachedInputTokens)
-        outputTokens = Self.compact(summary.outputTokens)
-        turns = Self.compact(summary.turns)
-        chats = Self.compact(summary.chats)
+    init(projection: UsageAnalyticsProjection) {
+        totalTokens = Self.compact(projection.totalTokens)
+        inputTokens = Self.compact(projection.uncachedInputTokens)
+        cachedInputTokens = Self.compact(projection.cachedInputTokens)
+        outputTokens = Self.compact(projection.outputTokens)
+        turns = Self.compact(projection.turns)
+        chats = Self.compact(projection.chats)
+        coverage = "\(projection.observedDayCount)/\(projection.requestedDayCount) days"
+        dataThrough = projection.dataThrough.map(Self.dateFormatter.string(from:)) ?? "Unavailable"
     }
 
     private static func compact(_ value: Int64) -> String {
@@ -44,11 +48,19 @@ struct UsageAnalyticsPresentation: Equatable {
             .replacingOccurrences(of: ".0", with: "")
         return text + unit.suffix
     }
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter
+    }()
 }
 
 final class UsageAnalyticsMenuView: NSView {
     static let width: CGFloat = 260
-    static let height: CGFloat = 170
+    static let height: CGFloat = 210
 
     init(presentation: UsageAnalyticsPresentation) {
         super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: Self.height))
@@ -64,7 +76,9 @@ final class UsageAnalyticsMenuView: NSView {
             Self.labelRow(title: "Cached input", value: presentation.cachedInputTokens),
             Self.labelRow(title: "Output tokens", value: presentation.outputTokens),
             Self.labelRow(title: "Turns", value: presentation.turns),
-            Self.labelRow(title: "Chats", value: presentation.chats)
+            Self.labelRow(title: "Chats", value: presentation.chats),
+            Self.labelRow(title: "Coverage", value: presentation.coverage),
+            Self.labelRow(title: "Data through", value: presentation.dataThrough)
         ]
         let stack = NSStackView(views: [titleLabel] + rows)
         stack.orientation = .vertical

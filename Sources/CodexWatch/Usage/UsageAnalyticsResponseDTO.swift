@@ -69,52 +69,6 @@ struct UsageAnalyticsResponseDTO: Decodable {
         )
     }
 
-    func summary(
-        periodStart: Date,
-        periodEnd: Date,
-        calendar: Calendar = .current,
-        fetchedAt: Date = .now
-    ) -> UsageAnalyticsSummary? {
-        let requestedStart = calendar.startOfDay(for: periodStart)
-        let requestedEnd = calendar.startOfDay(for: periodEnd)
-        guard groupBy == "day",
-              !data.isEmpty,
-              requestedStart <= requestedEnd else { return nil }
-
-        var aggregate = UsageAnalyticsTotalsDTO.zero
-        var observedDates = Set<Date>()
-        for day in data {
-            guard let dateText = day.date,
-                  let date = Self.parseDate(dateText, calendar: calendar),
-                  date >= requestedStart,
-                  date <= requestedEnd,
-                  observedDates.insert(date).inserted,
-                  let totals = day.totals,
-                  totals.isCompleteAndNonnegative,
-                  let next = aggregate.adding(totals) else { return nil }
-            aggregate = next
-        }
-
-        guard let totalTokens = aggregate.textTotalTokens,
-              let uncachedInputTokens = aggregate.uncachedTextInputTokens,
-              let cachedInputTokens = aggregate.cachedTextInputTokens,
-              let outputTokens = aggregate.textOutputTokens,
-              let turns = aggregate.turns,
-              let chats = aggregate.threads else { return nil }
-
-        return UsageAnalyticsSummary(
-            periodStart: periodStart,
-            periodEnd: periodEnd,
-            totalTokens: totalTokens,
-            uncachedInputTokens: uncachedInputTokens,
-            cachedInputTokens: cachedInputTokens,
-            outputTokens: outputTokens,
-            turns: turns,
-            chats: chats,
-            fetchedAt: fetchedAt
-        )
-    }
-
     private static func parseDate(_ text: String, calendar: Calendar) -> Date? {
         let parts = text.split(separator: "-", omittingEmptySubsequences: false)
         guard parts.count == 3,
@@ -197,15 +151,6 @@ struct UsageAnalyticsTotalsDTO: Decodable {
         case textTotalTokens = "text_total_tokens"
     }
 
-    static let zero = UsageAnalyticsTotalsDTO(
-        threads: 0,
-        turns: 0,
-        uncachedTextInputTokens: 0,
-        cachedTextInputTokens: 0,
-        textOutputTokens: 0,
-        textTotalTokens: 0
-    )
-
     var isCompleteAndNonnegative: Bool {
         [
             threads,
@@ -238,28 +183,6 @@ struct UsageAnalyticsTotalsDTO: Decodable {
         )
     }
 
-    func adding(_ other: UsageAnalyticsTotalsDTO) -> UsageAnalyticsTotalsDTO? {
-        guard let threads = Self.sum(threads, other.threads),
-              let turns = Self.sum(turns, other.turns),
-              let uncached = Self.sum(uncachedTextInputTokens, other.uncachedTextInputTokens),
-              let cached = Self.sum(cachedTextInputTokens, other.cachedTextInputTokens),
-              let output = Self.sum(textOutputTokens, other.textOutputTokens),
-              let total = Self.sum(textTotalTokens, other.textTotalTokens) else { return nil }
-        return UsageAnalyticsTotalsDTO(
-            threads: threads,
-            turns: turns,
-            uncachedTextInputTokens: uncached,
-            cachedTextInputTokens: cached,
-            textOutputTokens: output,
-            textTotalTokens: total
-        )
-    }
-
-    private static func sum(_ lhs: Int64?, _ rhs: Int64?) -> Int64? {
-        guard let lhs, let rhs else { return nil }
-        let result = lhs.addingReportingOverflow(rhs)
-        return result.overflow ? nil : result.partialValue
-    }
 }
 
 struct UsageAnalyticsModelDTO: Decodable {

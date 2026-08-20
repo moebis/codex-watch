@@ -66,38 +66,6 @@ struct CodexUsageClient {
         self.analyticsEndpoint = analyticsEndpoint ?? Self.defaultAnalyticsEndpoint(from: endpoint)
     }
 
-    func fetchAnalytics(
-        referenceDate: Date = .now,
-        calendar: Calendar = .current
-    ) async throws -> UsageAnalyticsSummary {
-        let periodEnd = calendar.startOfDay(for: referenceDate)
-        guard let periodStart = calendar.date(byAdding: .day, value: -29, to: periodEnd) else {
-            throw CodexUsageError.invalidHTTPResponse
-        }
-        let requestURL = try analyticsRequestURL(
-            periodStart: periodStart,
-            periodEnd: periodEnd,
-            calendar: calendar
-        )
-
-        let data = try await fetchData(from: requestURL)
-        do {
-            let response = try JSONDecoder().decode(UsageAnalyticsResponseDTO.self, from: data)
-            guard let summary = response.summary(
-                periodStart: periodStart,
-                periodEnd: periodEnd,
-                calendar: calendar
-            ) else {
-                throw CodexUsageError.decodingFailed
-            }
-            return summary
-        } catch let error as CodexUsageError {
-            throw error
-        } catch {
-            throw CodexUsageError.decodingFailed
-        }
-    }
-
     func fetchAnalyticsDataset(
         referenceDate: Date = .now,
         calendar: Calendar = .current
