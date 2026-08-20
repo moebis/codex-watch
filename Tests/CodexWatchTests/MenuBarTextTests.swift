@@ -152,10 +152,16 @@ final class MenuBarTextTests: XCTestCase {
 
         MenuBarButtonStyle.apply(to: button)
 
+        let image = button.image
+        XCTAssertNotNil(image)
         XCTAssertTrue(button.imageHugsTitle)
         XCTAssertEqual(button.imagePosition, .imageLeading)
         XCTAssertEqual(button.alignment, .center)
         XCTAssertEqual(button.font?.pointSize, MenuBarButtonStyle.fontSize)
+        XCTAssertEqual(image?.size, NSSize(width: 16, height: 16))
+        XCTAssertFalse(image?.isTemplate ?? true)
+        XCTAssertEqual(image?.accessibilityDescription, "Codex Watch quota monitor")
+        XCTAssertNotNil(image?.tiffRepresentation)
     }
 
     func testStatusTitleShowsRoundedWeeklyRemainingPercent() {
@@ -241,7 +247,7 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertNotNil(presentation.resetDetail)
     }
 
-    func testProgressPresentationIncludesEveryQuotaWindowAndItsPace() {
+    func testProgressPresentationHidesSparkButKeepsOtherQuotaWindowsAndPace() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let weekly = UsageWindow(
             id: "weekly",
@@ -264,6 +270,20 @@ final class MenuBarTextTests: XCTestCase {
             resetAt: now.addingTimeInterval(2.5 * 3_600),
             durationSeconds: 5 * 3_600
         )
+        let sparkWeekly = UsageWindow(
+            id: "codex-spark-weekly",
+            kind: .weekly,
+            usedPercent: 0,
+            resetAt: now.addingTimeInterval(6 * 86_400),
+            durationSeconds: 7 * 86_400
+        )
+        let projectLimit = UsageWindow(
+            id: "project-limit",
+            kind: .daily,
+            usedPercent: 25,
+            resetAt: now.addingTimeInterval(18 * 3_600),
+            durationSeconds: 24 * 3_600
+        )
         let codeReview = UsageWindow(
             id: "code-review-primary",
             kind: .daily,
@@ -273,7 +293,19 @@ final class MenuBarTextTests: XCTestCase {
         )
         let snapshot = UsageSnapshot(
             windows: [fiveHour, weekly],
-            additionalWindows: [NamedUsageWindow(id: spark.id, title: "Codex Spark 5-hour", window: spark)],
+            additionalWindows: [
+                NamedUsageWindow(id: spark.id, title: "Codex Spark 5-hour", window: spark),
+                NamedUsageWindow(
+                    id: sparkWeekly.id,
+                    title: "Codex Spark Weekly",
+                    window: sparkWeekly
+                ),
+                NamedUsageWindow(
+                    id: projectLimit.id,
+                    title: "Project Limit",
+                    window: projectLimit
+                )
+            ],
             codeReviewWindows: [NamedUsageWindow(id: codeReview.id, title: "Code Review", window: codeReview)]
         )
 
@@ -281,16 +313,16 @@ final class MenuBarTextTests: XCTestCase {
 
         XCTAssertEqual(
             presentation.quotaWindows.map(\.title),
-            ["Weekly", "5-hour", "Codex Spark 5-hour", "Code Review"]
+            ["Weekly", "5-hour", "Project Limit", "Code Review"]
         )
         XCTAssertEqual(presentation.quotaWindows[0].paceText, "11% in reserve")
         XCTAssertEqual(presentation.quotaWindows[1].paceText, "10% in deficit")
-        XCTAssertEqual(presentation.quotaWindows[2].paceText, "25% in reserve")
+        XCTAssertEqual(presentation.quotaWindows[2].paceText, "On pace")
         XCTAssertEqual(presentation.quotaWindows[3].paceText, "On pace")
         XCTAssertEqual(presentation.quotaValue, "40%")
     }
 
-    func testProgressMenuRendersNamedQuotaAndPaceLabels() {
+    func testProgressMenuDoesNotRenderSparkQuotaOrPaceLabels() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let spark = UsageWindow(
             id: "codex-spark",
@@ -315,8 +347,8 @@ final class MenuBarTextTests: XCTestCase {
         )
 
         let values = textValues(in: view)
-        XCTAssertTrue(values.contains("Codex Spark 5-hour remaining"))
-        XCTAssertTrue(values.contains("25% in reserve"))
+        XCTAssertFalse(values.contains("Codex Spark 5-hour remaining"))
+        XCTAssertFalse(values.contains("25% in reserve"))
     }
 
     func testPlanDisplayUsesNormalizedNameAndNeverExposesUnknownValues() {
