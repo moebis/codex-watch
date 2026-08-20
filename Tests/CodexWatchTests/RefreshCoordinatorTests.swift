@@ -187,6 +187,38 @@ final class RefreshCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testFreshMenuOpenReschedulesAdaptiveDelayFromInteractionTime() async {
+        let gate = FetchGate()
+        let sleeps = SleepRecorder()
+        let clock = TestClock(Date(timeIntervalSince1970: 2_000_000_000))
+        let coordinator = makeCoordinator(
+            gate: gate,
+            frequency: .adaptive,
+            now: { clock.now },
+            sleep: { delay in
+                await sleeps.record(delay)
+                try await Task.sleep(nanoseconds: UInt64.max)
+            }
+        )
+
+        coordinator.trigger(.automatic)
+        await gate.waitForFetchCount(1)
+        await gate.release(trigger: .automatic)
+        await coordinator.waitUntilIdleForTesting()
+        await sleeps.waitForCount(1)
+
+        clock.now.addTimeInterval(30)
+        coordinator.trigger(.menuOpened)
+        for _ in 0 ..< 100 { await Task.yield() }
+
+        let fetchCount = await gate.fetchCountValue()
+        let delays = await sleeps.delaysValue()
+        XCTAssertEqual(fetchCount, 1)
+        XCTAssertEqual(delays, [1_800, 120])
+        coordinator.stop()
+    }
+
+    @MainActor
     private func makeCoordinator(
         gate: FetchGate,
         frequency: RefreshFrequency = .manual,

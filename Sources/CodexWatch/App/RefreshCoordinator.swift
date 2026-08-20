@@ -56,6 +56,13 @@ final class RefreshCoordinator {
             lastMenuOpenAt = currentTime
             if let lastSuccessfulQuotaAt,
                currentTime.timeIntervalSince(lastSuccessfulQuotaAt) <= RefreshPolicy.menuOpenFreshness {
+                if frequency == .adaptive {
+                    scheduledTask?.cancel()
+                    scheduledTask = nil
+                    if activeTask == nil {
+                        scheduleNext(after: generation)
+                    }
+                }
                 return
             }
         }

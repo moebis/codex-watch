@@ -348,6 +348,23 @@ final class CodexUsageClientTests: XCTestCase {
         }
     }
 
+    func testRedirectRequiresTheSameEffectiveHTTPSPort() {
+        let original = URL(string: "https://example.test/backend-api/wham/usage")!
+
+        XCTAssertTrue(SameHostHTTPSRedirectDelegate.allowsRedirect(
+            from: original,
+            to: URL(string: "https://example.test:443/next")!
+        ))
+        XCTAssertFalse(SameHostHTTPSRedirectDelegate.allowsRedirect(
+            from: original,
+            to: URL(string: "https://example.test:8443/next")!
+        ))
+        XCTAssertFalse(SameHostHTTPSRedirectDelegate.allowsRedirect(
+            from: original,
+            to: URL(string: "http://example.test/next")!
+        ))
+    }
+
     func testResetCreditEndpointOnAnotherHostIsRejectedWithoutBreakingUsage() async throws {
         let usageData = try Data(contentsOf: fixtureURL("usage-weekly-only.json"))
         MockURLProtocol.requestHandler = { request in

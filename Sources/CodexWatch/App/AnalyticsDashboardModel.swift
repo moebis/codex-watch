@@ -66,13 +66,14 @@ final class AnalyticsDashboardModel: ObservableObject {
 
     func csvString() throws -> String {
         guard let projection else { throw ModelError.dataUnavailable }
-        return try UsageAnalyticsCSVExporter.string(projection: projection)
+        return try UsageAnalyticsCSVExporter.string(projection: projection, calendar: calendar)
     }
 
     var suggestedCSVFilename: String {
         UsageAnalyticsCSVExporter.suggestedFilename(
             range: range,
-            dataThrough: projection?.dataThrough
+            dataThrough: projection?.dataThrough,
+            calendar: calendar
         )
     }
 

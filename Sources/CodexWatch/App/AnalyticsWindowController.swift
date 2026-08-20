@@ -25,6 +25,12 @@ final class AnalyticsWindowController: NSObject, NSWindowDelegate {
         model.update(dataset: dataset, error: errorState, now: .now)
     }
 
+    func windowWillClose(_ notification: Notification) {
+        guard let closingWindow = notification.object as? NSWindow,
+              closingWindow === window else { return }
+        window = nil
+    }
+
     private func makeWindow() -> NSWindow {
         let rootView = AnalyticsDashboardView(model: model) { [weak self] in
             self?.exportCSV()

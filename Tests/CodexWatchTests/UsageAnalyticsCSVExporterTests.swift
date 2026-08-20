@@ -85,6 +85,42 @@ final class UsageAnalyticsCSVExporterTests: XCTestCase {
         XCTAssertFalse(csv.contains("2026-01-15,Observed,0,0,0,0,5,2"))
     }
 
+    func testCSVPreservesProjectionDatesInPositiveOffsetCalendar() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Bratislava")!
+        let date = calendar.date(from: DateComponents(year: 2026, month: 8, day: 19))!
+        let projection = UsageAnalyticsProjection(
+            range: .days7,
+            periodStart: date,
+            periodEnd: date,
+            totals: .zero,
+            days: [UsageDayCell(date: date, state: .activityOnly(turns: 1, chats: 1))],
+            models: [],
+            clients: [],
+            comparison: nil,
+            dataThrough: date,
+            fetchedAt: date,
+            modelBreakdownIsPartial: false,
+            clientBreakdownIsPartial: false
+        )
+
+        let csv = try UsageAnalyticsCSVExporter.string(
+            projection: projection,
+            calendar: calendar
+        )
+
+        XCTAssertTrue(csv.contains("Data through,2026-08-19\r\n"))
+        XCTAssertTrue(csv.contains("2026-08-19,Activity only,,,,,1,1\r\n"))
+        XCTAssertEqual(
+            UsageAnalyticsCSVExporter.suggestedFilename(
+                range: .days7,
+                dataThrough: date,
+                calendar: calendar
+            ),
+            "codex-watch-analytics-7d-2026-08-19.csv"
+        )
+    }
+
     private func makeCSVProjection() -> UsageAnalyticsProjection {
         let observedDate = makeDate(year: 2026, month: 8, day: 19)
         let missingDate = makeDate(year: 2026, month: 8, day: 20)

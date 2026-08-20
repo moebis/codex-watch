@@ -24,7 +24,25 @@ enum SecureUsageSession {
     }
 }
 
-private final class SameHostHTTPSRedirectDelegate: NSObject, URLSessionTaskDelegate {
+final class SameHostHTTPSRedirectDelegate: NSObject, URLSessionTaskDelegate {
+    static func allowsRedirect(from originalURL: URL?, to redirectURL: URL?) -> Bool {
+        guard let originalURL,
+              let redirectURL,
+              originalURL.scheme?.lowercased() == "https",
+              redirectURL.scheme?.lowercased() == "https",
+              let originalHost = originalURL.host?.lowercased(),
+              redirectURL.host?.lowercased() == originalHost,
+              effectivePort(for: redirectURL) == effectivePort(for: originalURL) else {
+            return false
+        }
+        return true
+    }
+
+    private static func effectivePort(for url: URL) -> Int? {
+        if let port = url.port { return port }
+        return url.scheme?.lowercased() == "https" ? 443 : nil
+    }
+
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
@@ -32,8 +50,7 @@ private final class SameHostHTTPSRedirectDelegate: NSObject, URLSessionTaskDeleg
         newRequest request: URLRequest,
         completionHandler: @escaping (URLRequest?) -> Void
     ) {
-        guard request.url?.scheme == "https",
-              request.url?.host == task.originalRequest?.url?.host else {
+        guard Self.allowsRedirect(from: task.originalRequest?.url, to: request.url) else {
             completionHandler(nil)
             return
         }
@@ -131,9 +148,10 @@ struct CodexUsageClient {
         from endpoint: URL,
         timeoutInterval: TimeInterval = 15
     ) async throws -> Data {
-        guard endpoint.scheme == "https",
-              endpoint.host == self.endpoint.host,
-              endpoint.port == self.endpoint.port else {
+        guard SameHostHTTPSRedirectDelegate.allowsRedirect(
+            from: self.endpoint,
+            to: endpoint
+        ) else {
             throw CodexUsageError.invalidHTTPResponse
         }
         var request = URLRequest(

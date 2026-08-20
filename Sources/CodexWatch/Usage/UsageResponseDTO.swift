@@ -107,24 +107,35 @@ struct UsageResponseDTO: Decodable {
                           let seconds = dto.limitWindowSeconds,
                           let window = makeWindow(id: fallbackID, dto: dto) else { continue }
                     let isWeekly = seconds >= 6 * 24 * 60 * 60
-                    let id = isWeekly ? "codex-spark-weekly" : "codex-spark"
+                    let preferredID = isWeekly ? "codex-spark-weekly" : "codex-spark"
+                    let id = Self.uniqueID(preferredID, usedIDs: &usedIDs)
                     let title = isWeekly ? "Codex Spark Weekly" : "Codex Spark 5-hour"
-                    guard usedIDs.insert(id).inserted else { continue }
                     result.append(NamedUsageWindow(id: id, title: title, window: windowWithID(id, from: window)))
                 }
                 continue
             }
 
-            guard let source = firstNonEmpty(entry.meteredFeature, entry.limitName),
-                  let dto = entry.rateLimit?.primaryWindow ?? entry.rateLimit?.secondaryWindow else {
+            guard let source = firstNonEmpty(entry.meteredFeature, entry.limitName) else {
                 continue
             }
-            let id = Self.slugID(source)
-            guard !id.isEmpty,
-                  usedIDs.insert(id).inserted,
-                  let window = makeWindow(id: id, dto: dto) else { continue }
-            let title = Self.boundedText(firstNonEmpty(entry.limitName, entry.meteredFeature) ?? "Codex extra limit")
-            result.append(NamedUsageWindow(id: id, title: title, window: window))
+            let baseID = Self.slugID(source)
+            guard !baseID.isEmpty else { continue }
+            let baseTitle = firstNonEmpty(entry.limitName, entry.meteredFeature) ?? "Codex extra limit"
+            let candidates: [(WindowDTO?, String)] = [
+                (entry.rateLimit?.primaryWindow, "primary"),
+                (entry.rateLimit?.secondaryWindow, "secondary")
+            ]
+            for (dto, role) in candidates {
+                let preferredID = Self.appendingIDRole(role, to: baseID)
+                guard let window = makeWindow(id: preferredID, dto: dto) else { continue }
+                let id = Self.uniqueID(preferredID, usedIDs: &usedIDs)
+                let title = Self.windowTitle(base: baseTitle, kind: window.kind)
+                result.append(NamedUsageWindow(
+                    id: id,
+                    title: title,
+                    window: windowWithID(id, from: window)
+                ))
+            }
         }
         return result
     }
@@ -178,6 +189,39 @@ struct UsageResponseDTO: Decodable {
         }
         slug = slug.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
         return slug.isEmpty ? "" : "codex-\(slug)"
+    }
+
+    private static func appendingIDRole(_ role: String, to baseID: String) -> String {
+        let suffix = "-\(role)"
+        let maximumBaseLength = max(0, 64 - suffix.utf8.count)
+        let boundedBase = String(baseID.prefix(maximumBaseLength))
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        return boundedBase + suffix
+    }
+
+    private static func uniqueID(_ preferredID: String, usedIDs: inout Set<String>) -> String {
+        if usedIDs.insert(preferredID).inserted { return preferredID }
+        var counter = 2
+        while true {
+            let suffix = "-\(counter)"
+            let maximumBaseLength = max(0, 64 - suffix.utf8.count)
+            let boundedBase = String(preferredID.prefix(maximumBaseLength))
+                .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+            let candidate = boundedBase + suffix
+            if usedIDs.insert(candidate).inserted { return candidate }
+            counter += 1
+        }
+    }
+
+    private static func windowTitle(base: String, kind: UsageWindowKind) -> String {
+        let suffix: String
+        switch kind {
+        case let .rolling(hours): suffix = " \(hours)-hour"
+        case .daily: suffix = " Daily"
+        case .weekly: suffix = " Weekly"
+        case .custom: suffix = " Quota"
+        }
+        return boundedText(base, maximumUTF8Bytes: 128 - suffix.utf8.count) + suffix
     }
 
     private static func boundedText(_ value: String, maximumUTF8Bytes: Int = 128) -> String {
@@ -277,15 +321,16 @@ struct ResetCreditDetailsDTO: Decodable {
     func inventory() -> [ResetCredit] {
         credits.enumerated().compactMap { index, lossy in
             guard let dto = lossy.value,
-                  let status = Self.boundedNonEmpty(dto.status, maximumUTF8Bytes: 64),
-                  let grantedAt = dto.grantedAt else { return nil }
+                  let status = Self.boundedNonEmpty(dto.status, maximumUTF8Bytes: 64) else {
+                return nil
+            }
             let id = Self.boundedNonEmpty(dto.id, maximumUTF8Bytes: 256)
                 ?? "reset-credit-\(index)"
             return ResetCredit(
                 id: id,
                 status: status,
                 title: Self.boundedNonEmpty(dto.title, maximumUTF8Bytes: 256),
-                grantedAt: grantedAt,
+                grantedAt: dto.grantedAt,
                 expiresAt: dto.expiresAt,
                 isSupportedByPlan: dto.isSupportedByPlan
             )

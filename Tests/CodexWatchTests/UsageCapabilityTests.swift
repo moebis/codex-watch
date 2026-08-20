@@ -52,9 +52,27 @@ final class UsageCapabilityTests: XCTestCase {
 
         let inventory = response.inventory()
 
-        XCTAssertEqual(inventory.map(\.id), ["credit-b", "credit-a"])
-        XCTAssertEqual(inventory.map(\.title), ["Second reset", "First reset"])
-        XCTAssertEqual(inventory.map(\.status), ["available", "available"])
+        XCTAssertEqual(inventory.map(\.id), ["credit-b", "credit-a", "bad-credit"])
+        XCTAssertEqual(inventory.map(\.title), ["Second reset", "First reset", nil])
+        XCTAssertEqual(inventory.map(\.status), ["available", "available", "available"])
+    }
+
+    func testResetCreditWithExpiryButNoGrantRemainsInInventory() throws {
+        let response = try JSONDecoder().decode(
+            ResetCreditDetailsDTO.self,
+            from: Data(
+                #"{"credits":[{"id":"expiry-only","status":"available","expires_at":"2030-01-01T08:30:45Z","is_supported_by_plan":true}]}"#.utf8
+            )
+        )
+
+        let credit = try XCTUnwrap(response.inventory().first)
+
+        XCTAssertEqual(credit.id, "expiry-only")
+        XCTAssertNil(credit.grantedAt)
+        XCTAssertEqual(
+            credit.expiresAt,
+            ISO8601DateFormatter().date(from: "2030-01-01T08:30:45Z")
+        )
     }
 
     func testUnknownLimitUsesBoundedStableSlug() throws {
@@ -82,6 +100,25 @@ final class UsageCapabilityTests: XCTestCase {
         XCTAssertTrue(id.hasPrefix("codex-"))
         XCTAssertLessThanOrEqual(id.utf8.count, 64)
         XCTAssertNotNil(id.range(of: #"^[a-z0-9-]+$"#, options: .regularExpression))
+    }
+
+    func testUnknownAdditionalLimitPreservesBothValidWindows() throws {
+        let snapshot = try JSONDecoder().decode(
+            UsageResponseDTO.self,
+            from: Data(
+                #"{"additional_rate_limits":[{"limit_name":"Future Model","rate_limit":{"primary_window":{"used_percent":12,"limit_window_seconds":18000},"secondary_window":{"used_percent":34,"limit_window_seconds":604800}}}]}"#.utf8
+            )
+        ).snapshot()
+
+        XCTAssertEqual(snapshot.additionalWindows.map(\.id), [
+            "codex-future-model-primary",
+            "codex-future-model-secondary"
+        ])
+        XCTAssertEqual(snapshot.additionalWindows.map(\.title), [
+            "Future Model 5-hour",
+            "Future Model Weekly"
+        ])
+        XCTAssertEqual(snapshot.additionalWindows.map(\.window.kind), [.rolling(hours: 5), .weekly])
     }
 
     private func fixtureSnapshot() throws -> UsageSnapshot {

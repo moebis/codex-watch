@@ -5,10 +5,13 @@ enum UsageAnalyticsCSVExporter {
         case invalidNumericValue
     }
 
-    static func string(projection: UsageAnalyticsProjection) throws -> String {
+    static func string(
+        projection: UsageAnalyticsProjection,
+        calendar: Calendar = .current
+    ) throws -> String {
         var rows: [[String]] = [
             ["Codex Watch analytics", projection.range.title],
-            ["Data through", projection.dataThrough.map(dateText) ?? "Unavailable"],
+            ["Data through", projection.dataThrough.map { dateText($0, calendar: calendar) } ?? "Unavailable"],
             ["Coverage", "\(projection.observedDayCount)/\(projection.requestedDayCount) days"],
             [],
             ["Daily usage"],
@@ -22,7 +25,7 @@ enum UsageAnalyticsCSVExporter {
             switch day.state {
             case let .observed(totals):
                 rows.append([
-                    dateText(day.date),
+                    dateText(day.date, calendar: calendar),
                     "Observed",
                     String(totals.totalTokens),
                     String(totals.uncachedInputTokens),
@@ -33,11 +36,11 @@ enum UsageAnalyticsCSVExporter {
                 ])
             case let .activityOnly(turns, chats):
                 rows.append([
-                    dateText(day.date), "Activity only", "", "", "", "",
+                    dateText(day.date, calendar: calendar), "Activity only", "", "", "", "",
                     String(turns), String(chats)
                 ])
             case .missing:
-                rows.append([dateText(day.date), "Missing", "", "", "", "", "", ""])
+                rows.append([dateText(day.date, calendar: calendar), "Missing", "", "", "", "", "", ""])
             }
         }
 
@@ -83,8 +86,12 @@ enum UsageAnalyticsCSVExporter {
             .joined(separator: "\r\n") + "\r\n"
     }
 
-    static func suggestedFilename(range: AnalyticsRange, dataThrough: Date?) -> String {
-        let suffix = dataThrough.map(dateText) ?? "unavailable"
+    static func suggestedFilename(
+        range: AnalyticsRange,
+        dataThrough: Date?,
+        calendar: Calendar = .current
+    ) -> String {
+        let suffix = dataThrough.map { dateText($0, calendar: calendar) } ?? "unavailable"
         return "codex-watch-analytics-\(range.title)-\(suffix).csv"
     }
 
@@ -117,9 +124,7 @@ enum UsageAnalyticsCSVExporter {
         return "\(text)%"
     }
 
-    private static func dateText(_ date: Date) -> String {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    private static func dateText(_ date: Date, calendar: Calendar) -> String {
         let components = calendar.dateComponents([.year, .month, .day], from: date)
         return String(
             format: "%04d-%02d-%02d",
