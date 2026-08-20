@@ -3,6 +3,40 @@ import XCTest
 @testable import CodexWatch
 
 final class RefreshCoordinatorTests: XCTestCase {
+    func testFailedCapabilityRefreshPreservesLastGoodValueAndMarksItStale() {
+        let previous = profile(lifetimeTokens: 30_300_000_000)
+
+        let resolved = CapabilityRefreshState.resolve(
+            previous: previous,
+            wasStale: false,
+            attempt: CapabilityRefreshAttempt<CodexProfileStats>.failure
+        )
+
+        XCTAssertEqual(resolved.value, previous)
+        XCTAssertTrue(resolved.isStale)
+    }
+
+    func testSuccessfulCapabilityRefreshReplacesValueAndClearsStaleState() {
+        let previous = profile(lifetimeTokens: 30_300_000_000)
+        let replacement = profile(lifetimeTokens: 30_400_000_000)
+
+        let resolved = CapabilityRefreshState.resolve(
+            previous: previous,
+            wasStale: true,
+            attempt: CapabilityRefreshAttempt.success(replacement)
+        )
+        let notAttempted = CapabilityRefreshState.resolve(
+            previous: previous,
+            wasStale: true,
+            attempt: CapabilityRefreshAttempt<CodexProfileStats>.notAttempted
+        )
+
+        XCTAssertEqual(resolved.value, replacement)
+        XCTAssertFalse(resolved.isStale)
+        XCTAssertEqual(notAttempted.value, previous)
+        XCTAssertTrue(notAttempted.isStale)
+    }
+
     func testAdaptivePolicyUsesInteractionAndConstrainedDelays() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
 
@@ -232,6 +266,27 @@ final class RefreshCoordinatorTests: XCTestCase {
             sleep: sleep,
             fetch: { request in await gate.fetch(request) },
             publish: publish
+        )
+    }
+
+    private func profile(lifetimeTokens: Int64) -> CodexProfileStats {
+        CodexProfileStats(
+            lifetimeTokens: lifetimeTokens,
+            peakDailyTokens: nil,
+            longestRunningTurnSeconds: nil,
+            currentStreakDays: nil,
+            longestStreakDays: nil,
+            dailyBuckets: [],
+            insights: CodexProfileInsights(
+                fastModePercent: nil,
+                reasoningEffort: nil,
+                reasoningEffortPercent: nil,
+                uniqueSkillsUsed: nil,
+                totalSkillsUsed: nil,
+                totalChats: nil
+            ),
+            invocations: [],
+            fetchedAt: Date(timeIntervalSince1970: 100)
         )
     }
 }

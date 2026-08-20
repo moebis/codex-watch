@@ -59,6 +59,45 @@ struct RefreshResult: Equatable, Sendable {
     let snapshot: UsageSnapshot?
     let error: MenuBarErrorState?
     let analyticsStale: Bool
+    let profileStale: Bool
+
+    init(
+        snapshot: UsageSnapshot?,
+        error: MenuBarErrorState?,
+        analyticsStale: Bool,
+        profileStale: Bool = false
+    ) {
+        self.snapshot = snapshot
+        self.error = error
+        self.analyticsStale = analyticsStale
+        self.profileStale = profileStale
+    }
+}
+
+enum CapabilityRefreshAttempt<Value> {
+    case notAttempted
+    case success(Value)
+    case failure
+}
+
+struct CapabilityRefreshState<Value> {
+    let value: Value?
+    let isStale: Bool
+
+    static func resolve(
+        previous: Value?,
+        wasStale: Bool,
+        attempt: CapabilityRefreshAttempt<Value>
+    ) -> CapabilityRefreshState<Value> {
+        switch attempt {
+        case .notAttempted:
+            return CapabilityRefreshState(value: previous, isStale: wasStale)
+        case let .success(value):
+            return CapabilityRefreshState(value: value, isStale: false)
+        case .failure:
+            return CapabilityRefreshState(value: previous, isStale: previous != nil)
+        }
+    }
 }
 
 enum RefreshPolicy {
