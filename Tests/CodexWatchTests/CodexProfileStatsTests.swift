@@ -9,10 +9,7 @@ final class CodexProfileStatsTests: XCTestCase {
             from: Data(contentsOf: fixtureURL("profile-stats-complete.json"))
         )
         let fetchedAt = ISO8601DateFormatter().date(from: "2026-08-20T12:00:00Z")!
-        let profile = try XCTUnwrap(response.profileStats(
-            calendar: utcCalendar(),
-            fetchedAt: fetchedAt
-        ))
+        let profile = try XCTUnwrap(response.profileStats(fetchedAt: fetchedAt))
 
         XCTAssertEqual(profile.lifetimeTokens, 30_300_000_000)
         XCTAssertEqual(profile.peakDailyTokens, 1_100_000_000)
@@ -38,7 +35,7 @@ final class CodexProfileStatsTests: XCTestCase {
             CodexProfileResponseDTO.self,
             from: Data(contentsOf: fixtureURL("profile-stats-partial.json"))
         )
-        let profile = try XCTUnwrap(response.profileStats(calendar: utcCalendar()))
+        let profile = try XCTUnwrap(response.profileStats())
 
         XCTAssertEqual(profile.lifetimeTokens, 30_300_000_000)
         XCTAssertNil(profile.peakDailyTokens)
@@ -65,7 +62,7 @@ final class CodexProfileStatsTests: XCTestCase {
                 CodexProfileResponseDTO.self,
                 from: Data(json.utf8)
             )
-            let profile = try XCTUnwrap(response.profileStats(calendar: utcCalendar()))
+            let profile = try XCTUnwrap(response.profileStats())
 
             XCTAssertEqual(profile.lifetimeTokens, 1)
             XCTAssertTrue(profile.dailyBuckets.isEmpty)
@@ -79,7 +76,7 @@ final class CodexProfileStatsTests: XCTestCase {
                 #"{"stats":{"lifetime_tokens":9223372036854775808,"peak_daily_tokens":"many","current_streak_days":999999999999999999999}}"#.utf8
             )
         )
-        let profile = try XCTUnwrap(response.profileStats(calendar: utcCalendar()))
+        let profile = try XCTUnwrap(response.profileStats())
 
         XCTAssertNil(profile.lifetimeTokens)
         XCTAssertNil(profile.peakDailyTokens)
@@ -92,7 +89,32 @@ final class CodexProfileStatsTests: XCTestCase {
             from: Data(#"{"profile":{"display_name":"Ignored"}}"#.utf8)
         )
 
-        XCTAssertNil(response.profileStats(calendar: utcCalendar()))
+        XCTAssertNil(response.profileStats())
+    }
+
+    func testProfileDatesUseFixedPOSIXGregorianSemantics() throws {
+        let parsed = try XCTUnwrap(CodexProfileDateParser.parse("2026-08-19"))
+
+        XCTAssertEqual(parsed, day("2026-08-19"))
+        XCTAssertEqual(CodexProfileDateParser.calendar.identifier, .gregorian)
+        XCTAssertEqual(CodexProfileDateParser.calendar.locale?.identifier, "en_US_POSIX")
+        XCTAssertEqual(CodexProfileDateParser.calendar.timeZone.secondsFromGMT(), 0)
+    }
+
+    func testTopInvocationsAreBoundedAfterRanking() throws {
+        let entries = (1 ... 75).map { index in
+            #"{"plugin_id":"\#(index)","plugin_name":"plugin-\#(index)","type":"plugin","usage_count":\#(index)}"#
+        }.joined(separator: ",")
+        let response = try JSONDecoder().decode(
+            CodexProfileResponseDTO.self,
+            from: Data(#"{"stats":{"top_invocations":[\#(entries)]}}"#.utf8)
+        )
+
+        let profile = try XCTUnwrap(response.profileStats())
+
+        XCTAssertEqual(profile.invocations.count, CodexProfileResponseDTO.maximumInvocationCount)
+        XCTAssertEqual(profile.invocations.first?.usageCount, 75)
+        XCTAssertEqual(profile.invocations.last?.usageCount, 26)
     }
 
     private func utcCalendar() -> Calendar {

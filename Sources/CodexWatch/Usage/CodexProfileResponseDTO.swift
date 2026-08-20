@@ -1,6 +1,8 @@
 import Foundation
 
 struct CodexProfileResponseDTO: Decodable {
+    static let maximumInvocationCount = 50
+
     private let stats: StatsDTO?
 
     enum CodingKeys: String, CodingKey {
@@ -12,10 +14,7 @@ struct CodexProfileResponseDTO: Decodable {
         stats = try? container.decodeIfPresent(StatsDTO.self, forKey: .stats)
     }
 
-    func profileStats(
-        calendar: Calendar = .current,
-        fetchedAt: Date = .now
-    ) -> CodexProfileStats? {
+    func profileStats(fetchedAt: Date = .now) -> CodexProfileStats? {
         guard let stats else { return nil }
         return CodexProfileStats(
             lifetimeTokens: Self.nonnegative(stats.lifetimeTokens),
@@ -23,7 +22,7 @@ struct CodexProfileResponseDTO: Decodable {
             longestRunningTurnSeconds: Self.nonnegative(stats.longestRunningTurnSeconds),
             currentStreakDays: Self.nonnegative(stats.currentStreakDays),
             longestStreakDays: Self.nonnegative(stats.longestStreakDays),
-            dailyBuckets: Self.validatedBuckets(stats.dailyUsageBuckets, calendar: calendar),
+            dailyBuckets: Self.validatedBuckets(stats.dailyUsageBuckets),
             insights: CodexProfileInsights(
                 fastModePercent: Self.percentage(stats.fastModePercent),
                 reasoningEffort: Self.boundedText(stats.reasoningEffort),
@@ -39,14 +38,13 @@ struct CodexProfileResponseDTO: Decodable {
 
     private static func validatedBuckets(
         _ values: [DailyBucketDTO]?,
-        calendar: Calendar
     ) -> [CodexProfileDailyBucket] {
         guard let values else { return [] }
         var dates = Set<Date>()
         var result: [CodexProfileDailyBucket] = []
         for value in values {
             guard let text = value.startDate,
-                  let date = parseDate(text, calendar: calendar),
+                  let date = CodexProfileDateParser.parse(text),
                   dates.insert(date).inserted,
                   let tokens = nonnegative(value.tokens) else { return [] }
             result.append(CodexProfileDailyBucket(date: date, tokens: tokens))
@@ -59,7 +57,7 @@ struct CodexProfileResponseDTO: Decodable {
     ) -> [CodexProfileInvocation] {
         guard let values else { return [] }
         var usedIDs = Set<String>()
-        return values.compactMap { lossy in
+        let invocations: [CodexProfileInvocation] = values.compactMap { lossy in
             guard let value = lossy.value,
                   let kind = value.type.flatMap(CodexProfileInvocation.Kind.init(rawValue:)),
                   let usageCount = nonnegative(value.usageCount) else { return nil }
@@ -76,11 +74,13 @@ struct CodexProfileResponseDTO: Decodable {
                 kind: kind,
                 usageCount: usageCount
             )
-        }.sorted {
+        }
+        let ranked = invocations.sorted {
             $0.usageCount == $1.usageCount
                 ? $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
                 : $0.usageCount > $1.usageCount
         }
+        return Array(ranked.prefix(Self.maximumInvocationCount))
     }
 
     private static func nonnegative<T: BinaryInteger>(_ value: T?) -> T? {
@@ -103,8 +103,17 @@ struct CodexProfileResponseDTO: Decodable {
         }
         return result.isEmpty ? nil : result
     }
+}
 
-    private static func parseDate(_ text: String, calendar: Calendar) -> Date? {
+enum CodexProfileDateParser {
+    static let calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_US_POSIX")
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }()
+
+    static func parse(_ text: String) -> Date? {
         let parts = text.split(separator: "-", omittingEmptySubsequences: false)
         guard parts.count == 3,
               parts[0].count == 4,
@@ -115,17 +124,17 @@ struct CodexProfileResponseDTO: Decodable {
               let month = Int(parts[1]),
               let day = Int(parts[2]) else { return nil }
         var components = DateComponents()
-        components.calendar = calendar
-        components.timeZone = calendar.timeZone
+        components.calendar = Self.calendar
+        components.timeZone = Self.calendar.timeZone
         components.year = year
         components.month = month
         components.day = day
-        guard let date = calendar.date(from: components) else { return nil }
-        let roundTrip = calendar.dateComponents([.year, .month, .day], from: date)
+        guard let date = Self.calendar.date(from: components) else { return nil }
+        let roundTrip = Self.calendar.dateComponents([.year, .month, .day], from: date)
         guard roundTrip.year == year,
               roundTrip.month == month,
               roundTrip.day == day else { return nil }
-        return calendar.startOfDay(for: date)
+        return Self.calendar.startOfDay(for: date)
     }
 }
 

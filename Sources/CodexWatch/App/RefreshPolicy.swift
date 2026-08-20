@@ -60,17 +60,119 @@ struct RefreshResult: Equatable, Sendable {
     let error: MenuBarErrorState?
     let analyticsStale: Bool
     let profileStale: Bool
+    let quotaFetchedAt: Date?
 
     init(
         snapshot: UsageSnapshot?,
         error: MenuBarErrorState?,
         analyticsStale: Bool,
-        profileStale: Bool = false
+        profileStale: Bool = false,
+        quotaFetchedAt: Date? = nil
     ) {
         self.snapshot = snapshot
         self.error = error
         self.analyticsStale = analyticsStale
         self.profileStale = profileStale
+        self.quotaFetchedAt = quotaFetchedAt
+    }
+}
+
+enum QuotaRefreshAttempt: Equatable, Sendable {
+    case success(UsageSnapshot)
+    case failure(MenuBarErrorState)
+}
+
+enum RefreshBatch {
+    static func execute(
+        previousSnapshot: UsageSnapshot?,
+        analyticsWasStale: Bool,
+        profileWasStale: Bool,
+        includeAnalytics: Bool,
+        requestedAt: Date,
+        quota: @escaping () async -> QuotaRefreshAttempt,
+        analytics: @escaping () async -> CapabilityRefreshAttempt<UsageAnalyticsDataset>,
+        profile: @escaping () async -> CapabilityRefreshAttempt<CodexProfileStats>
+    ) async -> RefreshResult {
+        async let quotaAttempt = quota()
+        let analyticsAttempt: CapabilityRefreshAttempt<UsageAnalyticsDataset>
+        let profileAttempt: CapabilityRefreshAttempt<CodexProfileStats>
+        if includeAnalytics {
+            async let fetchedAnalytics = analytics()
+            async let fetchedProfile = profile()
+            (analyticsAttempt, profileAttempt) = await (fetchedAnalytics, fetchedProfile)
+        } else {
+            analyticsAttempt = .notAttempted
+            profileAttempt = .notAttempted
+        }
+
+        return resolve(
+            previousSnapshot: previousSnapshot,
+            analyticsWasStale: analyticsWasStale,
+            profileWasStale: profileWasStale,
+            requestedAt: requestedAt,
+            quotaAttempt: await quotaAttempt,
+            analyticsAttempt: analyticsAttempt,
+            profileAttempt: profileAttempt
+        )
+    }
+
+    private static func resolve(
+        previousSnapshot: UsageSnapshot?,
+        analyticsWasStale: Bool,
+        profileWasStale: Bool,
+        requestedAt: Date,
+        quotaAttempt: QuotaRefreshAttempt,
+        analyticsAttempt: CapabilityRefreshAttempt<UsageAnalyticsDataset>,
+        profileAttempt: CapabilityRefreshAttempt<CodexProfileStats>
+    ) -> RefreshResult {
+        let analyticsState = CapabilityRefreshState.resolve(
+            previous: previousSnapshot?.analyticsDataset,
+            wasStale: analyticsWasStale,
+            attempt: analyticsAttempt
+        )
+        let profileState = CapabilityRefreshState.resolve(
+            previous: previousSnapshot?.profileStats,
+            wasStale: profileWasStale,
+            attempt: profileAttempt
+        )
+
+        let baseSnapshot: UsageSnapshot?
+        let error: MenuBarErrorState?
+        let quotaFetchedAt: Date?
+        switch quotaAttempt {
+        case let .success(snapshot):
+            baseSnapshot = snapshot
+            error = nil
+            quotaFetchedAt = snapshot.fetchedAt
+        case let .failure(quotaError):
+            baseSnapshot = previousSnapshot
+            error = quotaError
+            quotaFetchedAt = nil
+        }
+
+        let combinedSnapshot: UsageSnapshot?
+        if let baseSnapshot {
+            combinedSnapshot = baseSnapshot
+                .adding(analyticsDataset: analyticsState.value)
+                .adding(profileStats: profileState.value)
+        } else if analyticsState.value != nil || profileState.value != nil {
+            combinedSnapshot = UsageSnapshot(
+                windows: [],
+                analyticsDataset: analyticsState.value,
+                profileStats: profileState.value,
+                fetchedAt: requestedAt
+            )
+        } else {
+            combinedSnapshot = nil
+        }
+
+        return RefreshResult(
+            snapshot: combinedSnapshot,
+            error: error,
+            analyticsStale: analyticsState.isStale,
+            profileStale: profileState.isStale,
+            quotaFetchedAt: quotaFetchedAt
+        )
     }
 }
 
@@ -109,6 +211,7 @@ enum RefreshPolicy {
         lastAttempt: Date?,
         now: Date
     ) -> Bool {
+        if trigger == .menuOpened { return false }
         if trigger == .manual { return true }
         guard let lastAttempt else { return true }
         return now.timeIntervalSince(lastAttempt) >= analyticsInterval

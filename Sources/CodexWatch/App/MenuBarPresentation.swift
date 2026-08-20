@@ -205,7 +205,8 @@ struct QuotaProgressPresentation: Equatable {
         quotaWindows = Self.makeQuotaWindows(snapshot: snapshot, now: now)
         statusDetail = error.map { MenuBarText.summary(snapshot: nil, error: $0) }
         updatedValue = error.flatMap { _ in
-            snapshot.map { MenuBarText.updatedLine(lastUpdated: $0.fetchedAt, now: now) }
+            guard snapshot?.weeklyWindow != nil else { return nil }
+            return snapshot.map { MenuBarText.updatedLine(lastUpdated: $0.fetchedAt, now: now) }
         }
 
         guard let weekly = snapshot?.weeklyWindow else {

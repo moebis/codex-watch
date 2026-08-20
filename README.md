@@ -10,7 +10,7 @@ Codex Watch is a native macOS menu bar app for monitoring ChatGPT Codex quota, t
 - The recognized ChatGPT plan, credits balance or `Unlimited`, available reset-credit count, and the earliest supported reset-credit expiry when present.
 - A compact 30-day menu summary for total, uncached-input, cached-input, and output tokens plus turns, chats, token coverage, and server data-through date.
 - A reusable native dashboard whose Usage tab provides 7-, 30-, 90-, and 365-day ranges, summary cards, an Apple Charts token chart, an accessible activity heatmap, model activity, and client token totals.
-- A Lifetime tab with exact server-reported lifetime tokens, peak daily tokens, longest chat, current and longest streaks, daily token activity, activity insights, and most-used Codex plugins or skills.
+- A Lifetime tab with exact server-reported lifetime tokens, peak daily tokens, longest chat, current and longest streaks, returned daily token activity, activity insights, and the 50 most-used Codex plugins or skills.
 
 Model rows report turns, chats, credits, and turn share because the endpoint does not provide per-model token counts. Client rows report server-provided token fields. Dates with activity but no historical token fields are labeled `Activity only`; they are not treated as zero-token or missing days. Period comparisons appear only when both periods have at least 90% token coverage, and the 365-day range does not claim a comparison.
 

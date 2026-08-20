@@ -87,54 +87,29 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         do {
             let credentials = try authReader.read()
             let client = CodexUsageClient(credentials: credentials, session: session)
-            let quotaSnapshot = try await client.fetch()
-            let previousAnalyticsDataset = snapshot?.analyticsDataset
-            let previousProfileStats = snapshot?.profileStats
-            let analyticsAttempt: CapabilityRefreshAttempt<UsageAnalyticsDataset>
-            let profileAttempt: CapabilityRefreshAttempt<CodexProfileStats>
-
-            if request.includeAnalytics {
-                async let fetchedAnalytics = Self.fetchAnalytics(
-                    client: client,
-                    referenceDate: request.requestedAt
-                )
-                async let fetchedProfile = Self.fetchProfile(
-                    client: client,
-                    referenceDate: request.requestedAt
-                )
-                (analyticsAttempt, profileAttempt) = await (fetchedAnalytics, fetchedProfile)
-            } else {
-                analyticsAttempt = .notAttempted
-                profileAttempt = .notAttempted
-            }
-
-            let analyticsState = CapabilityRefreshState.resolve(
-                previous: previousAnalyticsDataset,
-                wasStale: analyticsStale,
-                attempt: analyticsAttempt
-            )
-            let profileState = CapabilityRefreshState.resolve(
-                previous: previousProfileStats,
-                wasStale: profileStale,
-                attempt: profileAttempt
-            )
-
-            return RefreshResult(
-                snapshot: quotaSnapshot
-                    .adding(analyticsDataset: analyticsState.value)
-                    .adding(profileStats: profileState.value),
-                error: nil,
-                analyticsStale: analyticsState.isStale,
-                profileStale: profileState.isStale
+            return await RefreshBatch.execute(
+                previousSnapshot: snapshot,
+                analyticsWasStale: analyticsStale,
+                profileWasStale: profileStale,
+                includeAnalytics: request.includeAnalytics,
+                requestedAt: request.requestedAt,
+                quota: {
+                    await Self.fetchQuota(client: client)
+                },
+                analytics: {
+                    await Self.fetchAnalytics(
+                        client: client,
+                        referenceDate: request.requestedAt
+                    )
+                },
+                profile: {
+                    await Self.fetchProfile(
+                        client: client,
+                        referenceDate: request.requestedAt
+                    )
+                }
             )
         } catch is CodexAuthError {
-            return RefreshResult(
-                snapshot: nil,
-                error: .signInRequired,
-                analyticsStale: analyticsStale,
-                profileStale: profileStale
-            )
-        } catch CodexUsageError.reauthenticationRequired {
             return RefreshResult(
                 snapshot: nil,
                 error: .signInRequired,
@@ -144,7 +119,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         } catch {
             return RefreshResult(
                 snapshot: nil,
-                error: .quotaUnavailable,
+                error: .signInRequired,
                 analyticsStale: analyticsStale,
                 profileStale: profileStale
             )
@@ -156,9 +131,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         profileStale = result.profileStale
         if let value = result.snapshot {
             snapshot = value
-            errorState = nil
-        } else if let error = result.error {
-            errorState = error
+        }
+        if result.snapshot != nil || result.error != nil {
+            errorState = result.error
         }
         updateStatusButton()
         analyticsWindowController?.update(
@@ -178,6 +153,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             return .success(try await client.fetchAnalyticsDataset(referenceDate: referenceDate))
         } catch {
             return .failure
+        }
+    }
+
+    private static func fetchQuota(client: CodexUsageClient) async -> QuotaRefreshAttempt {
+        do {
+            return .success(try await client.fetch())
+        } catch CodexUsageError.reauthenticationRequired {
+            return .failure(.signInRequired)
+        } catch {
+            return .failure(.quotaUnavailable)
         }
     }
 

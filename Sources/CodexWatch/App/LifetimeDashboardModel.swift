@@ -36,14 +36,16 @@ struct LifetimeDashboardModel: Equatable, Sendable {
     let dataThrough: String
     let fetchedAt: String
 
-    init(profile: CodexProfileStats, calendar: Calendar = .current) {
+    init(profile: CodexProfileStats) {
         lifetimeTokens = Self.optionalCompact(profile.lifetimeTokens)
         peakTokens = Self.optionalCompact(profile.peakDailyTokens)
         longestChat = profile.longestRunningTurnSeconds.map(Self.duration) ?? "Unavailable"
         currentStreak = profile.currentStreakDays.map(Self.days) ?? "Unavailable"
         longestStreak = profile.longestStreakDays.map(Self.days) ?? "Unavailable"
 
-        activityDays = Self.makeActivityDays(profile.dailyBuckets, calendar: calendar)
+        activityDays = profile.dailyBuckets.map {
+            LifetimeActivityDay(date: $0.date, tokens: $0.tokens)
+        }
         observedBucketCount = activityDays.count { $0.tokens != nil }
         maximumDailyTokens = activityDays.compactMap(\.tokens).max() ?? 0
         activityCoverage = Self.coverageText(
@@ -69,30 +71,6 @@ struct LifetimeDashboardModel: Equatable, Sendable {
             return "\(dateText(day.date)), \(tokens) tokens"
         }
         return "\(dateText(day.date)), token activity unavailable"
-    }
-
-    private static func makeActivityDays(
-        _ buckets: [CodexProfileDailyBucket],
-        calendar: Calendar
-    ) -> [LifetimeActivityDay] {
-        guard let first = buckets.first?.date,
-              let last = buckets.last?.date else { return [] }
-        let normalizedLast = calendar.startOfDay(for: last)
-        let earliestVisible = calendar.date(byAdding: .day, value: -365, to: normalizedLast)
-            .map(calendar.startOfDay(for:)) ?? normalizedLast
-        let start = max(calendar.startOfDay(for: first), earliestVisible)
-        let tokensByDate = Dictionary(uniqueKeysWithValues: buckets.map {
-            (calendar.startOfDay(for: $0.date), $0.tokens)
-        })
-
-        var result: [LifetimeActivityDay] = []
-        var date = start
-        while date <= normalizedLast, result.count < 366 {
-            result.append(LifetimeActivityDay(date: date, tokens: tokensByDate[date]))
-            guard let next = calendar.date(byAdding: .day, value: 1, to: date) else { break }
-            date = calendar.startOfDay(for: next)
-        }
-        return result
     }
 
     private static func makeInsights(_ insights: CodexProfileInsights) -> [LifetimeInsightRow] {
@@ -130,12 +108,10 @@ struct LifetimeDashboardModel: Equatable, Sendable {
     }
 
     private static func rangeText(_ first: Date, _ last: Date) -> String {
-        let start = first.formatted(
-            .dateTime.month(.abbreviated).day().locale(Locale(identifier: "en_US_POSIX"))
-        )
-        let end = last.formatted(
-            .dateTime.month(.abbreviated).day().year().locale(Locale(identifier: "en_US_POSIX"))
-        )
+        let sameYear = CodexProfileDateParser.calendar.component(.year, from: first)
+            == CodexProfileDateParser.calendar.component(.year, from: last)
+        let start = first.formatted(sameYear ? rangeStartStyle : dateStyle)
+        let end = last.formatted(dateStyle)
         return "\(start)–\(end)"
     }
 
@@ -184,9 +160,7 @@ struct LifetimeDashboardModel: Equatable, Sendable {
     }
 
     private static func dateText(_ date: Date) -> String {
-        date.formatted(
-            .dateTime.year().month(.abbreviated).day().locale(Locale(identifier: "en_US_POSIX"))
-        )
+        date.formatted(dateStyle)
     }
 
     private static func dateTimeText(_ date: Date) -> String {
@@ -195,4 +169,22 @@ struct LifetimeDashboardModel: Equatable, Sendable {
                 .locale(Locale(identifier: "en_US_POSIX"))
         )
     }
+
+    private static let dateStyle = Date.FormatStyle(
+        date: .abbreviated,
+        time: .omitted,
+        locale: Locale(identifier: "en_US_POSIX"),
+        calendar: CodexProfileDateParser.calendar,
+        timeZone: CodexProfileDateParser.calendar.timeZone
+    )
+
+    private static let rangeStartStyle = Date.FormatStyle(
+        date: .omitted,
+        time: .omitted,
+        locale: Locale(identifier: "en_US_POSIX"),
+        calendar: CodexProfileDateParser.calendar,
+        timeZone: CodexProfileDateParser.calendar.timeZone
+    )
+    .month(.abbreviated)
+    .day()
 }

@@ -19,7 +19,7 @@ The bounded 365-day aggregate endpoint cannot reproduce the exact lifetime total
 - Perform a bounded read-only GET of `/backend-api/wham/profiles/me` through the existing ephemeral, no-cookie, same-host HTTPS client.
 - Decode only optional `stats` values needed for display. Ignore profile identity and editing fields, keep the validated result only in memory, and never estimate missing lifetime values.
 - Refresh profile statistics only when the existing analytics cadence permits. Profile failure is independent from quota and bounded Usage analytics; preserve last-good in-memory values and mark the analytics surfaces stale.
-- Add a separate Lifetime dashboard tab for the exact headline metrics, daily activity buckets, activity insights, and top Codex invocations. Keep bounded 7/30/90/365 projections and CSV export under Usage.
+- Add a separate Lifetime dashboard tab for the exact headline metrics, daily activity buckets, activity insights, and the 50 highest-ranked Codex invocations. Parse date-only buckets with fixed POSIX Gregorian UTC semantics, render only the returned buckets, and label their actual first and last observed dates. Keep bounded 7/30/90/365 projections and CSV export under Usage.
 - Hide only `codex-spark` and `codex-spark-weekly` from the compact menu while preserving them in the decoded capability model.
 - Replace the template pie symbol with a deterministic non-template colored monitoring mark so AppKit cannot recolor it to an illegible selected-state black. Keep the existing approved app artwork and verify every standard ICNS representation.
 

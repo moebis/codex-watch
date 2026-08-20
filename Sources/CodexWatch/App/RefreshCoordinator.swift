@@ -130,8 +130,8 @@ final class RefreshCoordinator {
     private func finish(result: RefreshResult, generation requestGeneration: Int) {
         guard !stopped, requestGeneration == generation else { return }
         activeTask = nil
-        if let snapshot = result.snapshot {
-            lastSuccessfulQuotaAt = snapshot.fetchedAt
+        if let quotaFetchedAt = result.quotaFetchedAt {
+            lastSuccessfulQuotaAt = quotaFetchedAt
         }
         publish(result)
         scheduleNext(after: requestGeneration)

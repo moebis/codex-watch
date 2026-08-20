@@ -99,6 +99,62 @@ final class RefreshCoordinatorTests: XCTestCase {
             lastAttempt: now,
             now: now
         ))
+        XCTAssertFalse(RefreshPolicy.shouldIncludeAnalytics(
+            trigger: .menuOpened,
+            lastAttempt: nil,
+            now: now
+        ))
+        XCTAssertFalse(RefreshPolicy.shouldIncludeAnalytics(
+            trigger: .menuOpened,
+            lastAttempt: now.addingTimeInterval(-1_800),
+            now: now
+        ))
+    }
+
+    func testEligibleRefreshStartsCapabilitiesTogetherAndPublishesThemWhenQuotaFails() async {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let previous = UsageSnapshot(
+            windows: [UsageWindow(id: "weekly", kind: .weekly, usedPercent: 20)],
+            analyticsDataset: analytics(total: 10),
+            profileStats: profile(lifetimeTokens: 10),
+            fetchedAt: now.addingTimeInterval(-300)
+        )
+        let gate = CapabilityStartGate()
+        let task = Task {
+            await RefreshBatch.execute(
+                previousSnapshot: previous,
+                analyticsWasStale: true,
+                profileWasStale: true,
+                includeAnalytics: true,
+                requestedAt: now,
+                quota: {
+                    await gate.start("quota")
+                    return .failure(.quotaUnavailable)
+                },
+                analytics: {
+                    await gate.start("analytics")
+                    return .success(self.analytics(total: 20))
+                },
+                profile: {
+                    await gate.start("profile")
+                    return .success(self.profile(lifetimeTokens: 30))
+                }
+            )
+        }
+
+        await gate.waitForStartCount(3)
+        let startedNames = await gate.startedNames()
+        XCTAssertEqual(startedNames, Set(["quota", "analytics", "profile"]))
+        await gate.releaseAll()
+        let result = await task.value
+
+        XCTAssertEqual(result.snapshot?.weeklyWindow?.usedPercent, 20)
+        XCTAssertEqual(result.snapshot?.analyticsDataset?.days.first?.totals.totalTokens, 20)
+        XCTAssertEqual(result.snapshot?.profileStats?.lifetimeTokens, 30)
+        XCTAssertEqual(result.error, .quotaUnavailable)
+        XCTAssertFalse(result.analyticsStale)
+        XCTAssertFalse(result.profileStale)
+        XCTAssertNil(result.quotaFetchedAt)
     }
 
     func testStaleQuotaCopyUsesLastSuccessfulFetchTime() {
@@ -289,6 +345,30 @@ final class RefreshCoordinatorTests: XCTestCase {
             fetchedAt: Date(timeIntervalSince1970: 100)
         )
     }
+
+    private func analytics(total: Int64) -> UsageAnalyticsDataset {
+        let day = Date(timeIntervalSince1970: 2_000_000_000)
+        return UsageAnalyticsDataset(
+            requestedStart: day,
+            requestedEnd: day,
+            days: [UsageAnalyticsDay(
+                date: day,
+                totals: UsageTokenTotals(
+                    totalTokens: total,
+                    uncachedInputTokens: total,
+                    cachedInputTokens: 0,
+                    outputTokens: 0,
+                    turns: 1,
+                    chats: 1
+                ),
+                models: [],
+                clients: []
+            )],
+            fetchedAt: day,
+            modelBreakdownIsPartial: false,
+            clientBreakdownIsPartial: false
+        )
+    }
 }
 
 @MainActor
@@ -338,7 +418,8 @@ private actor FetchGate {
                 fetchedAt: Date(timeIntervalSince1970: 2_000_000_000)
             ),
             error: nil,
-            analyticsStale: false
+            analyticsStale: false,
+            quotaFetchedAt: Date(timeIntervalSince1970: 2_000_000_000)
         )
     }
 
@@ -350,5 +431,29 @@ private actor FetchGate {
         guard let request = requests.last(where: { $0.trigger == trigger }),
               let continuation = continuations.removeValue(forKey: request.generation) else { return }
         continuation.resume()
+    }
+}
+
+private actor CapabilityStartGate {
+    private var started: Set<String> = []
+    private var continuations: [CheckedContinuation<Void, Never>] = []
+
+    func start(_ name: String) async {
+        started.insert(name)
+        await withCheckedContinuation { continuation in
+            continuations.append(continuation)
+        }
+    }
+
+    func startedNames() -> Set<String> { started }
+
+    func waitForStartCount(_ count: Int) async {
+        while started.count < count { await Task.yield() }
+    }
+
+    func releaseAll() {
+        let pending = continuations
+        continuations.removeAll()
+        pending.forEach { $0.resume() }
     }
 }

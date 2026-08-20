@@ -11,8 +11,7 @@ final class LifetimeDashboardModelTests: XCTestCase {
                 longestSeconds: 56_580,
                 currentStreak: 42,
                 longestStreak: 82
-            ),
-            calendar: utcCalendar()
+            )
         )
 
         XCTAssertEqual(model.lifetimeTokens, "30.3B")
@@ -30,8 +29,7 @@ final class LifetimeDashboardModelTests: XCTestCase {
                 longestSeconds: nil,
                 currentStreak: nil,
                 longestStreak: nil
-            ),
-            calendar: utcCalendar()
+            )
         )
 
         XCTAssertEqual(model.lifetimeTokens, "Unavailable")
@@ -41,7 +39,7 @@ final class LifetimeDashboardModelTests: XCTestCase {
         XCTAssertEqual(model.longestStreak, "Unavailable")
     }
 
-    func testActivityDaysRemainChronologicalAndDoNotTurnGapsIntoZero() {
+    func testActivityUsesOnlyServerBucketsAndReportsActualCoverageEndpoints() {
         let profile = makeProfile(
             lifetimeTokens: 1,
             peakTokens: 1,
@@ -54,19 +52,36 @@ final class LifetimeDashboardModelTests: XCTestCase {
             ]
         )
 
-        let model = LifetimeDashboardModel(profile: profile, calendar: utcCalendar())
+        let model = LifetimeDashboardModel(profile: profile)
 
-        XCTAssertEqual(model.activityDays.map(\.date), [
-            day("2026-08-18"), day("2026-08-19"), day("2026-08-20")
-        ])
-        XCTAssertEqual(model.activityDays.map(\.tokens), [20, nil, 40])
+        XCTAssertEqual(model.activityDays.map(\.date), [day("2026-08-18"), day("2026-08-20")])
+        XCTAssertEqual(model.activityDays.map(\.tokens), [20, 40])
         XCTAssertEqual(model.observedBucketCount, 2)
         XCTAssertEqual(model.maximumDailyTokens, 40)
         XCTAssertEqual(model.activityCoverage, "2 server-observed days · Aug 18–Aug 20, 2026")
         XCTAssertEqual(
             LifetimeDashboardModel.accessibilityText(model.activityDays[1]),
-            "Aug 19, 2026, token activity unavailable"
+            "Aug 20, 2026, 40 tokens"
         )
+    }
+
+    func testActivityDoesNotDiscardBucketsOlderThanOneYear() {
+        let profile = makeProfile(
+            lifetimeTokens: 1,
+            peakTokens: 1,
+            longestSeconds: 60,
+            currentStreak: 1,
+            longestStreak: 1,
+            dailyBuckets: [
+                CodexProfileDailyBucket(date: day("2024-01-01"), tokens: 20),
+                CodexProfileDailyBucket(date: day("2026-08-20"), tokens: 40)
+            ]
+        )
+
+        let model = LifetimeDashboardModel(profile: profile)
+
+        XCTAssertEqual(model.activityDays.map(\.date), [day("2024-01-01"), day("2026-08-20")])
+        XCTAssertEqual(model.activityCoverage, "2 server-observed days · Jan 1, 2024–Aug 20, 2026")
     }
 
     func testInsightsAndInvocationsUseServerValues() {
@@ -96,7 +111,7 @@ final class LifetimeDashboardModelTests: XCTestCase {
             fetchedAt: day("2026-08-20")
         )
 
-        let model = LifetimeDashboardModel(profile: profile, calendar: utcCalendar())
+        let model = LifetimeDashboardModel(profile: profile)
 
         XCTAssertEqual(model.insights.map(\.value), ["7%", "Extra High · 60%", "82", "8.4K", "6.3K"])
         XCTAssertEqual(model.invocations.first?.name, "@superpowers")

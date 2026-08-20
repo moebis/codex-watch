@@ -124,6 +124,6 @@ final class AnalyticsDashboardModel: ObservableObject {
                 calendar: calendar
             )
         }
-        lifetime = profileStats.map { LifetimeDashboardModel(profile: $0, calendar: calendar) }
+        lifetime = profileStats.map { LifetimeDashboardModel(profile: $0) }
     }
 }
