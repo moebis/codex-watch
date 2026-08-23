@@ -40,7 +40,20 @@ struct CodexAuthReader: CredentialsReading {
                   fileSize <= Self.maximumAuthFileSize else {
                 throw CodexAuthError.invalidAuthFormat
             }
-            data = try Data(contentsOf: authURL)
+            let handle = try FileHandle(forReadingFrom: authURL)
+            defer { try? handle.close() }
+            var boundedData = Data()
+            boundedData.reserveCapacity(fileSize)
+            while boundedData.count <= Self.maximumAuthFileSize {
+                let remaining = Self.maximumAuthFileSize + 1 - boundedData.count
+                guard let chunk = try handle.read(upToCount: min(64 * 1_024, remaining)),
+                      !chunk.isEmpty else { break }
+                boundedData.append(chunk)
+            }
+            guard boundedData.count <= Self.maximumAuthFileSize else {
+                throw CodexAuthError.invalidAuthFormat
+            }
+            data = boundedData
         } catch let error as CodexAuthError {
             throw error
         } catch {

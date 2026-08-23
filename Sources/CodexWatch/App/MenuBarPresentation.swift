@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 
+@MainActor
 enum MenuBarButtonStyle {
     static let fontSize: CGFloat = 12
     static let imageSize = NSSize(width: 16, height: 16)
@@ -229,9 +230,8 @@ struct QuotaProgressPresentation: Equatable {
         for window in snapshot.windows where window.id != snapshot.weeklyWindow?.id {
             append(id: window.id, title: title(for: window.kind), window: window)
         }
-        let hiddenAdditionalWindowIDs: Set<String> = ["codex-spark", "codex-spark-weekly"]
         for named in snapshot.additionalWindows + snapshot.codeReviewWindows
-            where !hiddenAdditionalWindowIDs.contains(named.id) {
+            where named.id != "codex-spark" && !named.id.hasPrefix("codex-spark-") {
             append(id: named.id, title: named.title, window: named.window)
         }
         return result

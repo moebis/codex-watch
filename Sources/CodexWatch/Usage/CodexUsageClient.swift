@@ -58,7 +58,7 @@ final class SameHostHTTPSRedirectDelegate: NSObject, URLSessionTaskDelegate {
     }
 }
 
-struct CodexUsageClient {
+struct CodexUsageClient: Sendable {
     static let defaultEndpoint = URL(string: "https://chatgpt.com/backend-api/wham/usage")!
     static let resetCreditsPath = "/backend-api/wham/rate-limit-reset-credits"
     static let analyticsPath = "/backend-api/wham/analytics/daily-workspace-usage-counts"

@@ -89,9 +89,9 @@ enum RefreshBatch {
         profileWasStale: Bool,
         includeAnalytics: Bool,
         requestedAt: Date,
-        quota: @escaping () async -> QuotaRefreshAttempt,
-        analytics: @escaping () async -> CapabilityRefreshAttempt<UsageAnalyticsDataset>,
-        profile: @escaping () async -> CapabilityRefreshAttempt<CodexProfileStats>
+        quota: @Sendable @escaping () async -> QuotaRefreshAttempt,
+        analytics: @Sendable @escaping () async -> CapabilityRefreshAttempt<UsageAnalyticsDataset>,
+        profile: @Sendable @escaping () async -> CapabilityRefreshAttempt<CodexProfileStats>
     ) async -> RefreshResult {
         async let quotaAttempt = quota()
         let analyticsAttempt: CapabilityRefreshAttempt<UsageAnalyticsDataset>
@@ -176,13 +176,13 @@ enum RefreshBatch {
     }
 }
 
-enum CapabilityRefreshAttempt<Value> {
+enum CapabilityRefreshAttempt<Value: Sendable>: Sendable {
     case notAttempted
     case success(Value)
     case failure
 }
 
-struct CapabilityRefreshState<Value> {
+struct CapabilityRefreshState<Value: Sendable>: Sendable {
     let value: Value?
     let isStale: Bool
 

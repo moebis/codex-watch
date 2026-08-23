@@ -4,7 +4,7 @@ import Foundation
 @MainActor
 final class MenuBarController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
-    private let authReader: CodexAuthReader
+    private let authReader: any CredentialsReading
     private let session: URLSession
     private let defaults: UserDefaults
     private let persistRefreshFrequency: (RefreshFrequency) -> Void
@@ -18,7 +18,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     init(
         statusItem: NSStatusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength),
-        authReader: CodexAuthReader = CodexAuthReader(),
+        authReader: any CredentialsReading = CodexAuthReader(),
         session: URLSession = SecureUsageSession.make(),
         defaults: UserDefaults = .standard,
         refreshFrequency: RefreshFrequency = .adaptive,
@@ -90,7 +90,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private func fetch(request: RefreshRequest) async -> RefreshResult {
         do {
-            let credentials = try authReader.read()
+            let authReader = authReader
+            let credentials = try await Task.detached(priority: .utility) {
+                try authReader.read()
+            }.value
             let client = CodexUsageClient(credentials: credentials, session: session)
             return await RefreshBatch.execute(
                 previousSnapshot: snapshot,
@@ -114,19 +117,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                     )
                 }
             )
-        } catch is CodexAuthError {
-            return RefreshResult(
-                snapshot: nil,
-                error: .signInRequired,
-                analyticsStale: analyticsStale,
-                profileStale: profileStale
-            )
         } catch {
             return RefreshResult(
                 snapshot: nil,
                 error: .signInRequired,
-                analyticsStale: analyticsStale,
-                profileStale: profileStale
+                analyticsStale: analyticsStale || snapshot?.analyticsDataset != nil,
+                profileStale: profileStale || snapshot?.profileStats != nil
             )
         }
     }

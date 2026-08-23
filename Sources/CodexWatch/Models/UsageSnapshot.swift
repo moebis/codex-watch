@@ -234,32 +234,3 @@ enum CreditsRemaining: Equatable, Sendable {
         }
     }
 }
-
-enum WeeklyQuotaLevel: Equatable, Sendable {
-    case healthy
-    case warning
-    case critical
-    case unavailable
-
-    init(weeklyWindow: UsageWindow?) {
-        guard let weeklyWindow else {
-            self = .unavailable
-            return
-        }
-        self.init(remainingPercent: weeklyWindow.remainingPercent)
-    }
-
-    init(remainingPercent: Double) {
-        guard remainingPercent.isFinite else {
-            self = .critical
-            return
-        }
-        if remainingPercent <= 10 {
-            self = .critical
-        } else if remainingPercent <= 20 {
-            self = .warning
-        } else {
-            self = .healthy
-        }
-    }
-}

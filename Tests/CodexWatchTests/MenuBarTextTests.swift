@@ -280,6 +280,80 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertTrue(visibleTextValues(in: view).contains("Input tokens"))
     }
 
+    func testAuthenticationFailureMarksRetainedCapabilityDataStale() async {
+        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let controller = MenuBarController(
+            statusItem: statusItem,
+            authReader: CodexAuthReader(
+                environment: [:],
+                homeDirectory: URL(fileURLWithPath: "/definitely/not/the-test-home")
+            ),
+            session: URLSession(configuration: .ephemeral),
+            refreshFrequency: .manual
+        )
+        controller.apply(result: RefreshResult(
+            snapshot: UsageSnapshot(
+                windows: [],
+                analyticsDataset: makeAnalyticsDataset(
+                    totalTokens: 1_000,
+                    inputTokens: 200,
+                    cachedInputTokens: 700,
+                    outputTokens: 100,
+                    turns: 4,
+                    chats: 2
+                ),
+                profileStats: makeLifetimeProfile()
+            ),
+            error: nil,
+            analyticsStale: false,
+            profileStale: false
+        ))
+        controller.start()
+        defer { controller.stop() }
+
+        for _ in 0 ..< 100 where !controller.analyticsStale || !controller.profileStale {
+            await Task.yield()
+        }
+
+        XCTAssertTrue(controller.analyticsStale)
+        XCTAssertTrue(controller.profileStale)
+    }
+
+    func testCredentialReadDoesNotBlockMainActor() async {
+        let reader = BlockingCredentialsReader()
+        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let controller = MenuBarController(
+            statusItem: statusItem,
+            authReader: reader,
+            session: URLSession(configuration: .ephemeral),
+            refreshFrequency: .manual
+        )
+        let responsivenessProbe = Task.detached {
+            Self.probeMainActorResponsiveness(whileReadingWith: reader)
+        }
+        controller.start()
+        defer { controller.stop() }
+
+        let isResponsive = await responsivenessProbe.value
+        XCTAssertTrue(isResponsive)
+    }
+
+    private nonisolated static func probeMainActorResponsiveness(
+        whileReadingWith reader: BlockingCredentialsReader
+    ) -> Bool {
+        guard reader.started.wait(timeout: .now() + 1) == .success else {
+            reader.release.signal()
+            return false
+        }
+        let mainActorRan = DispatchSemaphore(value: 0)
+        Task { @MainActor in
+            mainActorRan.signal()
+        }
+        let isResponsive = mainActorRan.wait(timeout: .now() + 0.25) == .success
+        reader.release.signal()
+        return isResponsive
+    }
+
     func testStatusButtonUsesAdaptivePieTemplateAndCompactTitleLayout() {
         let button = NSButton(frame: .zero)
 
@@ -470,6 +544,39 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertEqual(presentation.quotaWindows[2].paceText, "On pace")
         XCTAssertEqual(presentation.quotaWindows[3].paceText, "On pace")
         XCTAssertEqual(presentation.quotaValue, "40%")
+    }
+
+    func testProgressPresentationHidesDuplicateSparkWindowIDs() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let duplicateSpark = UsageWindow(
+            id: "codex-spark-2",
+            kind: .rolling(hours: 5),
+            usedPercent: 25
+        )
+        let duplicateSparkWeekly = UsageWindow(
+            id: "codex-spark-weekly-2",
+            kind: .weekly,
+            usedPercent: 0
+        )
+        let snapshot = UsageSnapshot(
+            windows: [],
+            additionalWindows: [
+                NamedUsageWindow(
+                    id: duplicateSpark.id,
+                    title: "Codex Spark 5-hour",
+                    window: duplicateSpark
+                ),
+                NamedUsageWindow(
+                    id: duplicateSparkWeekly.id,
+                    title: "Codex Spark Weekly",
+                    window: duplicateSparkWeekly
+                )
+            ]
+        )
+
+        let presentation = QuotaProgressPresentation(snapshot: snapshot, error: nil, now: now)
+
+        XCTAssertTrue(presentation.quotaWindows.isEmpty)
     }
 
     func testProgressMenuDoesNotRenderSparkQuotaOrPaceLabels() {
@@ -867,5 +974,16 @@ final class MenuBarTextTests: XCTestCase {
         view.subviews.flatMap { child in
             (child as? NSTextField).map { [$0.stringValue] } ?? textValues(in: child)
         }
+    }
+}
+
+private final class BlockingCredentialsReader: CredentialsReading, @unchecked Sendable {
+    let started = DispatchSemaphore(value: 0)
+    let release = DispatchSemaphore(value: 0)
+
+    func read() throws -> CodexCredentials {
+        started.signal()
+        release.wait()
+        throw CodexAuthError.authFileUnavailable
     }
 }

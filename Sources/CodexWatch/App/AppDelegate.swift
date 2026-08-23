@@ -13,6 +13,7 @@ enum AppIdentity {
     }
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarController: MenuBarController?
     private var wakeObserver: NSObjectProtocol?
