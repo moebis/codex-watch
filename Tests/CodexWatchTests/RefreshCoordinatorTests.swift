@@ -109,6 +109,31 @@ final class RefreshCoordinatorTests: XCTestCase {
             lastAttempt: now.addingTimeInterval(-1_800),
             now: now
         ))
+        XCTAssertFalse(RefreshPolicy.shouldIncludeAnalytics(
+            trigger: .rateLimitUpdated,
+            lastAttempt: nil,
+            now: now
+        ))
+    }
+
+    @MainActor
+    func testRateLimitUpdateTriggersCoalesceIntoOneQuotaOnlyFetch() async {
+        let gate = FetchGate()
+        let coordinator = makeCoordinator(gate: gate)
+
+        coordinator.trigger(.rateLimitUpdated)
+        coordinator.trigger(.rateLimitUpdated)
+        await gate.waitForFetchCount(1)
+
+        let request = await gate.lastRequest()
+        XCTAssertEqual(request?.trigger, .rateLimitUpdated)
+        XCTAssertFalse(request?.includeAnalytics ?? true)
+
+        await gate.release(trigger: .rateLimitUpdated)
+        await coordinator.waitUntilIdleForTesting()
+        let fetchCount = await gate.fetchCountValue()
+        XCTAssertEqual(fetchCount, 1)
+        coordinator.stop()
     }
 
     func testEligibleRefreshStartsCapabilitiesTogetherAndPublishesThemWhenQuotaFails() async {
@@ -120,6 +145,8 @@ final class RefreshCoordinatorTests: XCTestCase {
             fetchedAt: now.addingTimeInterval(-300)
         )
         let gate = CapabilityStartGate()
+        let refreshedAnalytics = analytics(total: 20)
+        let refreshedProfile = profile(lifetimeTokens: 30)
         let task = Task {
             await RefreshBatch.execute(
                 previousSnapshot: previous,
@@ -133,11 +160,11 @@ final class RefreshCoordinatorTests: XCTestCase {
                 },
                 analytics: {
                     await gate.start("analytics")
-                    return .success(self.analytics(total: 20))
+                    return .success(refreshedAnalytics)
                 },
                 profile: {
                     await gate.start("profile")
-                    return .success(self.profile(lifetimeTokens: 30))
+                    return .success(refreshedProfile)
                 }
             )
         }
@@ -405,6 +432,8 @@ private actor FetchGate {
     func fetchCountValue() -> Int { requests.count }
 
     func lastTrigger() -> RefreshTrigger? { requests.last?.trigger }
+
+    func lastRequest() -> RefreshRequest? { requests.last }
 
     func fetch(_ request: RefreshRequest) async -> RefreshResult {
         requests.append(request)

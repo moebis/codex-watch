@@ -24,8 +24,8 @@ if [[ -n "$ARCHITECTURES" ]]; then
     done
 fi
 
-swift build "${BUILD_ARGS[@]}"
 BIN_DIR="$(swift build "${BUILD_ARGS[@]}" --show-bin-path)"
+swift build "${BUILD_ARGS[@]}"
 BIN_PATH="$BIN_DIR/$PRODUCT_NAME"
 APP_PATH="$DIST_DIR/$APP_NAME.app"
 

@@ -50,6 +50,82 @@ final class AnalyticsDashboardModelTests: XCTestCase {
         XCTAssertEqual(model.errorState, .analyticsUnavailable)
     }
 
+    func testDashboardRefreshStatusUsesFetchedTimeThenLastSuccessfulTimeWhenStale() {
+        let suiteName = "AnalyticsDashboardModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let model = AnalyticsDashboardModel(defaults: defaults, calendar: utcCalendar())
+        let fetchedAt = day("2026-08-20")
+
+        model.update(dataset: makeDashboardDataset(total: 100), error: nil, now: fetchedAt)
+
+        XCTAssertEqual(model.selectedRefreshStatus?.label, "Fetched")
+        XCTAssertEqual(model.selectedRefreshStatus?.fetchedAt, fetchedAt)
+        XCTAssertEqual(model.selectedRefreshStatus?.isStale, false)
+
+        model.update(dataset: nil, error: .analyticsUnavailable, now: day("2026-08-21"))
+
+        XCTAssertEqual(model.selectedRefreshStatus?.label, "Last successful refresh")
+        XCTAssertEqual(model.selectedRefreshStatus?.fetchedAt, fetchedAt)
+        XCTAssertEqual(model.selectedRefreshStatus?.isStale, true)
+    }
+
+    func testDashboardRefreshStatusDoesNotInventTimestampWithoutSuccessfulData() {
+        let suiteName = "AnalyticsDashboardModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let model = AnalyticsDashboardModel(defaults: defaults, calendar: utcCalendar())
+
+        model.update(
+            dataset: nil,
+            error: .analyticsUnavailable,
+            profileStats: nil,
+            profileError: .profileUnavailable,
+            now: day("2026-08-20")
+        )
+
+        XCTAssertNil(model.selectedRefreshStatus)
+        model.section = .lifetime
+        XCTAssertNil(model.selectedRefreshStatus)
+    }
+
+    func testDashboardRefreshStatusUsesSelectedLifetimeFetch() {
+        let suiteName = "AnalyticsDashboardModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let model = AnalyticsDashboardModel(defaults: defaults, calendar: utcCalendar())
+        let fetchedAt = day("2026-08-20")
+        model.section = .lifetime
+
+        model.update(
+            dataset: nil,
+            error: nil,
+            profileStats: makeProfile(total: 100, fetchedAt: fetchedAt),
+            profileError: nil,
+            now: fetchedAt
+        )
+
+        XCTAssertEqual(model.selectedRefreshStatus?.label, "Fetched")
+        XCTAssertEqual(model.selectedRefreshStatus?.fetchedAt, fetchedAt)
+        XCTAssertEqual(model.selectedRefreshStatus?.isStale, false)
+    }
+
+    func testAnalyticsWindowControllerForwardsInjectedRefreshAction() {
+        let suiteName = "AnalyticsDashboardModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var refreshCount = 0
+        let controller = AnalyticsWindowController(
+            defaults: defaults,
+            calendar: utcCalendar(),
+            onRefresh: { refreshCount += 1 }
+        )
+
+        controller.requestRefresh()
+
+        XCTAssertEqual(refreshCount, 1)
+    }
+
     func testDashboardCSVUsesCurrentSelectedRange() throws {
         let suiteName = "AnalyticsDashboardModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

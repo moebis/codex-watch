@@ -41,11 +41,58 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertTrue(menuTitles.contains("Open Usage Analytics…"))
         XCTAssertTrue(menuTitles.contains("Open Analytics Dashboard…"))
         XCTAssertTrue(menuTitles.contains("Refresh Frequency"))
+        XCTAssertTrue(menuTitles.contains("Quota Notifications"))
+        XCTAssertTrue(menuTitles.contains("Launch at Login"))
+        XCTAssertTrue(menuTitles.contains("Copy Diagnostics"))
         XCTAssertFalse(menuTitles.contains { $0.localizedCaseInsensitiveContains("update") })
         XCTAssertEqual(
             AppIdentity.usageAnalyticsURL.absoluteString,
             "https://chatgpt.com/codex/cloud/settings/analytics#usage"
         )
+    }
+
+    func testQuotaPresentationExplainsWorkspaceLimitReason() {
+        let presentation = QuotaProgressPresentation(
+            snapshot: UsageSnapshot(
+                windows: [UsageWindow(id: "weekly", kind: .weekly, usedPercent: 100)],
+                rateLimitReachedReason: .workspaceCreditsDepleted
+            ),
+            error: nil,
+            now: .now
+        )
+
+        XCTAssertEqual(presentation.rateLimitReachedValue, "Workspace credits depleted")
+    }
+
+    func testConfirmedResetActionAppearsForOfficialAvailableCredit() {
+        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let controller = MenuBarController(
+            statusItem: statusItem,
+            accountService: MenuAccountServiceFake(),
+            refreshFrequency: .manual
+        )
+        defer { controller.stop() }
+
+        controller.apply(result: RefreshResult(
+            snapshot: UsageSnapshot(
+                windows: [],
+                resetCredits: [ResetCredit(
+                    id: "credit-one",
+                    status: "available",
+                    title: nil,
+                    grantedAt: nil,
+                    expiresAt: nil,
+                    isSupportedByPlan: true
+                )],
+                availableResetCredits: 1,
+                source: .appServer
+            ),
+            error: nil,
+            analyticsStale: false,
+            profileStale: false
+        ))
+
+        XCTAssertTrue(statusItem.menu?.items.contains { $0.title == "Use Reset Credit…" } == true)
     }
 
     func testRefreshPolicyLimitsAutomaticAnalyticsButAllowsManualRefresh() {
@@ -328,9 +375,9 @@ final class MenuBarTextTests: XCTestCase {
             session: URLSession(configuration: .ephemeral),
             refreshFrequency: .manual
         )
-        let responsivenessProbe = Task.detached {
-            Self.probeMainActorResponsiveness(whileReadingWith: reader)
-        }
+        let responsivenessProbe = Self.makeMainActorResponsivenessProbe(
+            whileReadingWith: reader
+        )
         controller.start()
         defer { controller.stop() }
 
@@ -352,6 +399,14 @@ final class MenuBarTextTests: XCTestCase {
         let isResponsive = mainActorRan.wait(timeout: .now() + 0.25) == .success
         reader.release.signal()
         return isResponsive
+    }
+
+    private nonisolated static func makeMainActorResponsivenessProbe(
+        whileReadingWith reader: BlockingCredentialsReader
+    ) -> Task<Bool, Never> {
+        Task.detached {
+            probeMainActorResponsiveness(whileReadingWith: reader)
+        }
     }
 
     func testStatusButtonUsesAdaptivePieTemplateAndCompactTitleLayout() {
@@ -544,6 +599,49 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertEqual(presentation.quotaWindows[2].paceText, "On pace")
         XCTAssertEqual(presentation.quotaWindows[3].paceText, "On pace")
         XCTAssertEqual(presentation.quotaValue, "40%")
+    }
+
+    func testProgressPresentationShowsProjectedExhaustionOnlyBeforeReset() throws {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let fastWindow = UsageWindow(
+            id: "weekly",
+            kind: .weekly,
+            usedPercent: 75,
+            resetAt: now.addingTimeInterval(3.5 * 86_400),
+            durationSeconds: 7 * 86_400
+        )
+        let onPaceWindow = UsageWindow(
+            id: "weekly",
+            kind: .weekly,
+            usedPercent: 50,
+            resetAt: now.addingTimeInterval(3.5 * 86_400),
+            durationSeconds: 7 * 86_400
+        )
+
+        let fast = QuotaWindowPresentation(
+            id: fastWindow.id,
+            title: "Weekly",
+            window: fastWindow,
+            now: now
+        )
+        let onPace = QuotaWindowPresentation(
+            id: onPaceWindow.id,
+            title: "Weekly",
+            window: onPaceWindow,
+            now: now
+        )
+
+        XCTAssertEqual(fast.projectedExhaustionAt, now.addingTimeInterval(28 * 3_600))
+        XCTAssertTrue(fast.projectedExhaustionText?.hasPrefix("Projected exhaustion: ") == true)
+        XCTAssertNil(onPace.projectedExhaustionAt)
+        XCTAssertNil(onPace.projectedExhaustionText)
+
+        let menu = QuotaProgressMenuView(presentation: QuotaProgressPresentation(
+            snapshot: UsageSnapshot(windows: [fastWindow]),
+            error: nil,
+            now: now
+        ))
+        XCTAssertTrue(textValues(in: menu).contains(fast.projectedExhaustionText!))
     }
 
     func testProgressPresentationHidesDuplicateSparkWindowIDs() {
@@ -986,4 +1084,27 @@ private final class BlockingCredentialsReader: CredentialsReading, @unchecked Se
         release.wait()
         throw CodexAuthError.authFileUnavailable
     }
+}
+
+private actor MenuAccountServiceFake: CodexAccountServing {
+    func fetchQuota(fetchedAt: Date) async throws -> UsageSnapshot {
+        UsageSnapshot(windows: [], fetchedAt: fetchedAt, source: .appServer)
+    }
+
+    func fetchProfile(fetchedAt: Date) async throws -> CodexProfileStats {
+        throw CodexAccountServiceError.unavailable
+    }
+
+    func consumeReset(
+        idempotencyKey: String,
+        creditID: String?
+    ) async throws -> AppServerResetOutcome {
+        .reset
+    }
+
+    func rateLimitUpdates() async throws -> AsyncStream<AppServerRateLimitSnapshot> {
+        AsyncStream { $0.finish() }
+    }
+
+    func stop() async {}
 }

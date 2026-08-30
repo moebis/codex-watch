@@ -77,6 +77,10 @@ enum MenuBarText {
         return "\(prefix): \(resetFormatter.string(from: expiresAt))"
     }
 
+    static func projectedExhaustionLine(_ projectedAt: Date) -> String {
+        "Projected exhaustion: \(resetFormatter.string(from: projectedAt))"
+    }
+
     static func updatedLine(lastUpdated: Date, now: Date) -> String {
         let elapsed = max(0, now.timeIntervalSince(lastUpdated))
         if elapsed < 60 { return "Updated just now" }
@@ -114,6 +118,8 @@ struct QuotaWindowPresentation: Equatable, Identifiable {
     let resetDetail: String?
     let resetProgress: Double?
     let paceText: String?
+    let projectedExhaustionAt: Date?
+    let projectedExhaustionText: String?
 
     init(id: String, title: String, window: UsageWindow, now: Date) {
         self.id = id
@@ -143,8 +149,14 @@ struct QuotaWindowPresentation: Equatable, Identifiable {
             } else {
                 paceText = "\(Int(abs(pace.deltaPercent).rounded()))% in reserve"
             }
+            projectedExhaustionAt = pace.projectedExhaustion
+            projectedExhaustionText = pace.projectedExhaustion.map(
+                MenuBarText.projectedExhaustionLine
+            )
         } else {
             paceText = nil
+            projectedExhaustionAt = nil
+            projectedExhaustionText = nil
         }
     }
 
@@ -166,6 +178,7 @@ struct QuotaProgressPresentation: Equatable {
     let resetCreditsDetail: String?
     let resetCreditsProgress: Double?
     let quotaWindows: [QuotaWindowPresentation]
+    let rateLimitReachedValue: String?
     let statusDetail: String?
     let updatedValue: String?
 
@@ -176,6 +189,7 @@ struct QuotaProgressPresentation: Equatable {
         resetCreditsDetail = MenuBarText.resetCreditExpiryLine(snapshot: snapshot)
         resetCreditsProgress = Self.resetCreditProgress(snapshot: snapshot, now: now)
         quotaWindows = Self.makeQuotaWindows(snapshot: snapshot, now: now)
+        rateLimitReachedValue = snapshot?.rateLimitReachedReason?.displayName
         statusDetail = error.map { MenuBarText.summary(snapshot: nil, error: $0) }
         updatedValue = error.flatMap { _ in
             guard snapshot?.weeklyWindow != nil else { return nil }
@@ -304,10 +318,12 @@ final class QuotaProgressMenuView: NSView {
         let statusHeight = [presentation.statusDetail, presentation.updatedValue]
             .compactMap { $0 }
             .reduce(CGFloat.zero) { total, _ in total + 18 }
+        let rateLimitHeight: CGFloat = presentation.rateLimitReachedValue == nil ? 0 : 18
         let viewHeight = baseHeight
             + (presentation.creditsRemainingValue == nil ? 0 : Self.creditsRemainingHeightIncrement)
             + quotaHeight
             + statusHeight
+            + rateLimitHeight
         super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: viewHeight))
         translatesAutoresizingMaskIntoConstraints = false
 
@@ -328,6 +344,9 @@ final class QuotaProgressMenuView: NSView {
         if let updatedValue = presentation.updatedValue {
             add(Self.detailLabel(updatedValue), to: stack)
         }
+        if let rateLimitReachedValue = presentation.rateLimitReachedValue {
+            add(Self.detailLabel(rateLimitReachedValue), to: stack)
+        }
 
         if presentation.quotaWindows.isEmpty {
             addQuota(
@@ -338,6 +357,7 @@ final class QuotaProgressMenuView: NSView {
                 resetProgress: presentation.resetProgress,
                 resetDetail: presentation.resetDetail,
                 paceText: nil,
+                projectedExhaustionText: nil,
                 to: stack,
                 includeSeparator: false
             )
@@ -387,6 +407,7 @@ final class QuotaProgressMenuView: NSView {
             resetProgress: window.resetProgress,
             resetDetail: window.resetDetail,
             paceText: window.paceText,
+            projectedExhaustionText: window.projectedExhaustionText,
             to: stack,
             includeSeparator: includeSeparator
         )
@@ -400,6 +421,7 @@ final class QuotaProgressMenuView: NSView {
         resetProgress: Double?,
         resetDetail: String?,
         paceText: String?,
+        projectedExhaustionText: String?,
         to stack: NSStackView,
         includeSeparator: Bool
     ) {
@@ -424,6 +446,9 @@ final class QuotaProgressMenuView: NSView {
         if let paceText {
             add(Self.detailLabel(paceText), to: stack)
         }
+        if let projectedExhaustionText {
+            add(Self.detailLabel(projectedExhaustionText), to: stack)
+        }
     }
 
     private func add(_ view: NSView, to stack: NSStackView) {
@@ -433,9 +458,13 @@ final class QuotaProgressMenuView: NSView {
 
     private static func extraQuotaHeight(_ windows: [QuotaWindowPresentation]) -> CGFloat {
         guard !windows.isEmpty else { return 0 }
-        let firstPace: CGFloat = windows[0].paceText == nil ? 0 : 18
-        return windows.dropFirst().reduce(firstPace) { total, window in
-            total + 70 + (window.resetDetail == nil ? 0 : 18) + (window.paceText == nil ? 0 : 18)
+        let firstDetails: CGFloat = (windows[0].paceText == nil ? 0 : 18)
+            + (windows[0].projectedExhaustionText == nil ? 0 : 18)
+        return windows.dropFirst().reduce(firstDetails) { total, window in
+            total + 70
+                + (window.resetDetail == nil ? 0 : 18)
+                + (window.paceText == nil ? 0 : 18)
+                + (window.projectedExhaustionText == nil ? 0 : 18)
         }
     }
 

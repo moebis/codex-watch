@@ -23,6 +23,13 @@ enum AnalyticsDashboardSection: String, CaseIterable, Identifiable, Sendable {
     var title: String { rawValue.capitalized }
 }
 
+struct AnalyticsDashboardRefreshStatus: Equatable, Sendable {
+    let fetchedAt: Date
+    let isStale: Bool
+
+    var label: String { isStale ? "Last successful refresh" : "Fetched" }
+}
+
 @MainActor
 final class AnalyticsDashboardModel: ObservableObject {
     enum ModelError: Error, Equatable {
@@ -112,6 +119,28 @@ final class AnalyticsDashboardModel: ObservableObject {
             range: range,
             dataThrough: projection?.dataThrough,
             calendar: calendar
+        )
+    }
+
+    var heatmapLayout: UsageHeatmapLayout? {
+        projection.map { UsageHeatmapLayout(days: $0.days, calendar: calendar) }
+    }
+
+    var selectedRefreshStatus: AnalyticsDashboardRefreshStatus? {
+        let fetchedAt: Date?
+        let stale: Bool
+        switch section {
+        case .usage:
+            fetchedAt = projection?.fetchedAt
+            stale = isStale
+        case .lifetime:
+            fetchedAt = profileStats?.fetchedAt
+            stale = profileIsStale
+        }
+        guard let fetchedAt else { return nil }
+        return AnalyticsDashboardRefreshStatus(
+            fetchedAt: fetchedAt,
+            isStale: stale
         )
     }
 

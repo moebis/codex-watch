@@ -39,6 +39,30 @@ final class LifetimeDashboardModelTests: XCTestCase {
         XCTAssertEqual(model.longestStreak, "Unavailable")
     }
 
+    func testLongestRunningTurnUnderOneMinuteNeverDisplaysZeroMinutes() {
+        let oneSecond = LifetimeDashboardModel(
+            profile: makeProfile(
+                lifetimeTokens: 1,
+                peakTokens: 1,
+                longestSeconds: 1,
+                currentStreak: 1,
+                longestStreak: 1
+            )
+        )
+        let fiftyNineSeconds = LifetimeDashboardModel(
+            profile: makeProfile(
+                lifetimeTokens: 1,
+                peakTokens: 1,
+                longestSeconds: 59,
+                currentStreak: 1,
+                longestStreak: 1
+            )
+        )
+
+        XCTAssertEqual(oneSecond.longestChat, "1s")
+        XCTAssertEqual(fiftyNineSeconds.longestChat, "59s")
+    }
+
     func testActivityUsesOnlyServerBucketsAndReportsActualCoverageEndpoints() {
         let profile = makeProfile(
             lifetimeTokens: 1,

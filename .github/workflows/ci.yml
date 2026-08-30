@@ -14,5 +14,9 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - name: Test build and release scripts
+        run: ./scripts/test_release_scripts.sh
+      - name: Compile with complete strict concurrency diagnostics
+        run: swift build -Xswiftc -strict-concurrency=complete -Xswiftc -warn-concurrency -Xswiftc -warnings-as-errors
       - name: Verify tests and app bundle
         run: ./scripts/verify.sh

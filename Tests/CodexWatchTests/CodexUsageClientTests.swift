@@ -248,6 +248,47 @@ final class CodexUsageClientTests: XCTestCase {
         XCTAssertEqual(snapshot.plan, .proLite)
     }
 
+    func testCurrentBusinessPlanVariantsNormalizeToBusiness() throws {
+        for apiValue in [
+            "team",
+            "self_serve_business_prolite",
+            "self_serve_business_usage_based"
+        ] {
+            let snapshot = try JSONDecoder().decode(
+                UsageResponseDTO.self,
+                from: Data("{\"plan_type\":\"\(apiValue)\"}".utf8)
+            ).snapshot()
+
+            XCTAssertEqual(snapshot.plan, .business, apiValue)
+        }
+    }
+
+    func testCurrentEnterprisePlanVariantsNormalizeToEnterprise() throws {
+        for apiValue in [
+            "ent26",
+            "enterprise_cbp_automation",
+            "enterprise_cbp_usage_based"
+        ] {
+            let snapshot = try JSONDecoder().decode(
+                UsageResponseDTO.self,
+                from: Data("{\"plan_type\":\"\(apiValue)\"}".utf8)
+            ).snapshot()
+
+            XCTAssertEqual(snapshot.plan, .enterprise, apiValue)
+        }
+    }
+
+    func testCurrentEducationPlanVariantsNormalizeToEdu() throws {
+        for apiValue in ["edu_plus", "edu_pro"] {
+            let snapshot = try JSONDecoder().decode(
+                UsageResponseDTO.self,
+                from: Data("{\"plan_type\":\"\(apiValue)\"}".utf8)
+            ).snapshot()
+
+            XCTAssertEqual(snapshot.plan, .edu, apiValue)
+        }
+    }
+
     func testMissingEntitlementOrInvalidCreditsBalanceIsNotFabricated() throws {
         for json in [
             #"{}"#,
@@ -517,7 +558,12 @@ final class CodexUsageClientTests: XCTestCase {
 }
 
 private final class MockURLProtocol: URLProtocol {
-    static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+    private static let requestHandlerStore = RequestHandlerStore()
+
+    static var requestHandler: RequestHandlerStore.Handler? {
+        get { requestHandlerStore.get() }
+        set { requestHandlerStore.set(newValue) }
+    }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
 
@@ -538,4 +584,23 @@ private final class MockURLProtocol: URLProtocol {
     }
 
     override func stopLoading() {}
+}
+
+private final class RequestHandlerStore: @unchecked Sendable {
+    typealias Handler = (URLRequest) throws -> (HTTPURLResponse, Data)
+
+    private let lock = NSLock()
+    private var handler: Handler?
+
+    func get() -> Handler? {
+        lock.lock()
+        defer { lock.unlock() }
+        return handler
+    }
+
+    func set(_ handler: Handler?) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.handler = handler
+    }
 }

@@ -1,25 +1,4 @@
 contracts:
-  - id: MENU-BAR-001
-    title: The quota is presented only in the macOS menu bar
-    status: superseded
-    statement: The app displays a system icon and the rounded remaining weekly percentage in one variable-length NSStatusItem. The icon hugs the title so both are centered as one compact unit, while the status item retains native macOS outer spacing and click behavior. It creates no notch overlay, floating panel, Dock icon, or ordinary app window.
-    rationale: Native compact image-title layout matches surrounding menu bar items without fragile negative spacing or a reduced click target, and avoids screen geometry, pointer interception, and overlay privacy risks.
-    source: user-confirmed
-    owner: project-maintainer
-    risk: medium
-    scope:
-      include: [menu-bar, status-menu]
-      exclude: [notch-overlay, session-state]
-    examples:
-      positive: The menu bar shows an icon directly adjacent to 68% as one centered unit and opens a small quota menu.
-      negative: The icon is pinned to one edge with excessive space before the number, or a transparent panel is positioned around the physical camera notch.
-    guards:
-      - Tests/CodexWatchTests/MenuBarTextTests.swift
-      - "manual: inspect icon and percentage spacing on a real Mac"
-    supersedes: []
-    superseded_by: DASHBOARD-SURFACE-011
-    last_verified_commit: pending
-
   - id: QUOTA-SEMANTICS-002
     title: The displayed number is the remaining weekly percentage
     status: active
@@ -40,12 +19,12 @@ contracts:
       - Tests/CodexWatchTests/CodexUsageClientTests.swift
     supersedes: []
     superseded_by: null
-    last_verified_commit: 23b1418
+    last_verified_commit: 5ab8abf
 
   - id: PRIVACY-BOUNDARY-003
     title: Credentials and private Codex data remain minimally exposed
     status: active
-    statement: The app reads only the bounded local auth file, keeps credentials and authenticated responses in process memory, sends credentials only over HTTPS to the original ChatGPT usage host, and limits each response to one mebibyte before decoding. It never contacts an update service, scans sessions, reads prompts, logs sensitive data, caches responses, or stores cookies. Analytics leaves process memory only when the user explicitly chooses a CSV destination, and only the selected validated projection is written.
+    statement: The app prefers managed ChatGPT authentication through a local Codex app-server child process and optionally reads only the local auth file through an off-main, opened-handle read that enforces a one-mebibyte ceiling while consuming bytes. App-server JSONL lines and compatibility HTTPS responses each have a one-mebibyte ceiling. Compatibility credentials go only to the original ChatGPT HTTPS host. Credentials and authenticated responses remain in process memory; child stderr is discarded. The app never contacts an update service, scans sessions, reads prompts, logs sensitive data, caches responses, or stores cookies. Analytics leaves process memory only for a user-confirmed CSV. Notification text contains no quota value, and copied diagnostics contain operational state only.
     rationale: The app handles an access token and must minimize both data access and exfiltration paths.
     source: security-review
     owner: project-maintainer
@@ -54,7 +33,7 @@ contracts:
       include: [auth-reader, usage-client, network-session]
       exclude: [conversation-monitoring, telemetry, automatic-download, automatic-install]
     examples:
-      positive: Ephemeral bounded GET requests obtain usage, reset-credit, and 365-day analytics details; a CSV is written only after the user confirms a save destination.
+      positive: Bounded app-server messages obtain official account state, ephemeral bounded GET requests obtain richer analytics when file credentials are available, and a CSV is written only after the user confirms a save destination.
       negative: A rollout JSONL file is parsed, an authenticated redirect is followed to another host, or analytics is cached automatically on disk.
     guards:
       - Tests/CodexWatchTests/CodexAuthReaderTests.swift
@@ -63,12 +42,12 @@ contracts:
       - "manual: sensitive string and executable dependency review"
     supersedes: []
     superseded_by: null
-    last_verified_commit: 23b1418
+    last_verified_commit: 5ab8abf
 
   - id: PACKAGE-RELEASE-004
     title: Version tags produce verified GitHub release artifacts
     status: active
-    statement: A vMAJOR.MINOR.PATCH tag matching Info.plist triggers CI to test, build, verify, archive, checksum, and publish the app. The release workflow must use pinned actions and must not upload credentials or local Codex data.
+    statement: A vMAJOR.MINOR.PATCH tag matching Info.plist triggers CI to test, run the release-script regression harness, compile with complete strict-concurrency warnings as errors, build once per requested architecture set, verify, archive, extract into a unique temporary directory, verify the exact extracted app, checksum, and publish. The release workflow must use pinned actions and must not upload credentials or local Codex data.
     rationale: Tag-driven builds reduce the risk of a manually substituted binary and make the source-to-release path reviewable.
     source: security-review
     owner: project-maintainer
@@ -86,7 +65,7 @@ contracts:
       - scripts/verify_app.sh
     supersedes: []
     superseded_by: null
-    last_verified_commit: 23b1418
+    last_verified_commit: 5ab8abf
 
   - id: MENU-PROGRESS-005
     title: The status menu visualizes quota and exact time windows
@@ -108,34 +87,36 @@ contracts:
       - "manual: inspect all available progress bars and labels in the open menu on a real Mac"
     supersedes: []
     superseded_by: null
-    last_verified_commit: pending
+    last_verified_commit: 5ab8abf
 
   - id: RESET-CREDITS-006
     title: Available rate-limit reset credits are shown without fabrication
     status: active
-    statement: When the usage response includes a nonnegative rate_limit_reset_credits.available_count value, the status menu displays that count in a separate labeled row. The app also makes a best-effort read-only request to the same ChatGPT HTTPS host for reset-credit details and shows the earliest expiry among available credits supported by the current plan. When that same credit has exact granted_at and expires_at values, a native progress bar shows its clamped remaining lifetime. Zero is displayed as an available count, while a missing or invalid count hides the row. Missing detail metadata or a detail-request failure preserves the count without fabricating an expiry or duration. The app does not infer a total credit capacity or merge this count with the weekly automatic reset time.
+    statement: When either validated source includes a nonnegative available reset-credit count, the status menu displays that count separately. File-based compatibility may make a best-effort same-host read for expiry details; app-server responses may provide documented credit inventory directly. Exact grant and expiry values may drive a clamped lifetime bar, but missing metadata never creates an assumed duration. When an app-server credit is available, Use Reset Credit requires confirmation, sends one UUID idempotency key and optional documented credit ID, retains an uncertain request only in memory for safe retry, clears it only on an exact outcome, and refetches quota after every exact outcome. The app never redeems automatically or merges reset credits with the weekly automatic reset.
     rationale: Reset credits are useful actionable quota information, including when the next one will expire, but their meaning must remain distinct from the weekly window and absent values must not be misrepresented.
     source: user-confirmed
     owner: project-maintainer
     risk: high
     scope:
       include: [usage-parsing, status-menu, reset-credits]
-      exclude: [credit-redemption, inferred-credit-capacity, non-ChatGPT-network-requests]
+      exclude: [automatic-credit-redemption, inferred-credit-capacity, non-ChatGPT-network-requests]
     examples:
-      positive: Two available credits display as 2 available with the earliest supported available expiry in local time and its exact remaining-lifetime progress, while a failed detail request still displays the count.
-      negative: A missing grant time is treated as a fixed 30-day duration, or an expired or unsupported credit supplies the displayed expiry.
+      positive: Two available credits display as 2 available; a confirmed redemption uses one stable idempotency key across an uncertain retry and refreshes quota after a reset outcome.
+      negative: A missing grant time is treated as a fixed 30-day duration, or a credit is consumed in the background without user confirmation.
     guards:
       - Tests/CodexWatchTests/CodexUsageClientTests.swift
       - Tests/CodexWatchTests/MenuBarTextTests.swift
+      - Tests/CodexWatchTests/RecommendedFeaturesTests.swift
+      - Tests/CodexWatchTests/AppServer/CodexAppServerClientTests.swift
       - "manual: inspect the reset-credit row in the open menu on a real Mac"
     supersedes: []
     superseded_by: null
-    last_verified_commit: pending
+    last_verified_commit: 5ab8abf
 
   - id: PLAN-DISPLAY-008
     title: The status menu shows only a server-reported recognized ChatGPT plan
     status: active
-    statement: The expanded status menu contains an always-present Plan row. A recognized plan_type from the existing usage response is shown as a normalized ChatGPT plan name. Missing or unrecognized values display Unavailable; the app never guesses a plan, Pro sub-tier, token allowance, or absolute quota from percentages.
+    statement: The expanded status menu contains an always-present Plan row. Recognized current app-server and compatibility values normalize free, go, plus, pro, prolite, business and team variants, enterprise variants, and edu variants to a bounded display name. Missing, unknown, or changed values display Unavailable; the app never guesses a plan, token allowance, or absolute quota from percentages.
     rationale: The server-reported plan gives useful account context, while fail-closed normalization prevents an internal or changed field from becoming a misleading entitlement claim.
     source: user-confirmed
     owner: project-maintainer
@@ -152,7 +133,7 @@ contracts:
       - "manual: inspect the Plan row in the open menu on a real Mac"
     supersedes: []
     superseded_by: null
-    last_verified_commit: pending
+    last_verified_commit: 5ab8abf
 
   - id: CREDITS-BALANCE-009
     title: The status menu shows the server-reported ChatGPT credits remaining
@@ -174,34 +155,12 @@ contracts:
       - "manual: compare the Credits remaining row with the ChatGPT Usage Dashboard on a real Mac"
     supersedes: []
     superseded_by: null
-    last_verified_commit: pending
-
-  - id: USAGE-ANALYTICS-010
-    title: The menu shows only bounded server-reported aggregate usage
-    status: superseded
-    statement: Codex Watch may request the inclusive trailing 30 calendar days of daily aggregate usage from the authenticated ChatGPT HTTPS host and display the summed total, uncached-input, cached-input, and output tokens plus turns and threads. The app accepts only day-grouped rows with valid unique dates inside the requested interval and complete nonnegative non-overflowing totals, keeps the result only in process memory, refreshes it at launch and on manual refresh but no more than once every 15 minutes automatically, and preserves weekly quota plus any prior in-memory aggregate when the analytics request fails. It never scans local sessions, reads prompts, scrapes HTML, or fabricates lifetime totals, streaks, or profile statistics.
-    rationale: Server aggregates provide useful absolute usage detail without exposing conversation content, while bounded decoding and best-effort refresh preserve the app's narrow privacy and reliability boundary.
-    source: user-confirmed-and-observed-official-product
-    owner: project-maintainer
-    risk: high
-    scope:
-      include: [usage-analytics, usage-parsing, status-menu, network-session]
-      exclude: [session-scanning, prompt-reading, telemetry, html-scraping, lifetime-inference]
-    examples:
-      positive: Two complete daily rows are summed into truthful 30-day token, turn, and chat totals and a later analytics failure leaves the weekly quota working.
-      negative: A missing input-token field is treated as zero, a negative total is displayed, or rollout files are parsed to reconstruct lifetime usage.
-    guards:
-      - Tests/CodexWatchTests/CodexUsageClientTests.swift
-      - Tests/CodexWatchTests/MenuBarTextTests.swift
-      - "manual: compare the 30-day rows with the official Codex Usage Analytics page"
-    supersedes: []
-    superseded_by: USAGE-ANALYTICS-012
-    last_verified_commit: pending
+    last_verified_commit: 5ab8abf
 
   - id: DASHBOARD-SURFACE-011
     title: The menu bar remains persistent with one on-demand native analytics window
     status: active
-    statement: Codex Watch remains an LSUIElement app whose persistent control surface is one native NSStatusItem showing the rounded base-weekly percentage. The status menu may open one reusable 940 by 720 resizable native analytics window with 7, 30, 90, and 365 day ranges, but the app creates no notch overlay, hidden web view, persistent Dock icon, or duplicate analytics window.
+    statement: Codex Watch remains an LSUIElement app whose persistent control surface is one native NSStatusItem showing the rounded base-weekly percentage. The status menu may open one reusable 940 by 720 resizable native analytics window with 7, 30, 90, and 365 day ranges. The dashboard refresh action invokes the coordinated manual refresh, the heatmap is seven weekday rows by the needed week columns, and wide model and client tables scroll horizontally instead of clipping. The app creates no notch overlay, hidden web view, persistent Dock icon, or duplicate analytics window.
     rationale: A native on-demand window provides enough space for truthful charts, coverage, and model/client tables without returning to screen overlays or embedding browser state.
     source: user-confirmed
     owner: project-maintainer
@@ -215,10 +174,12 @@ contracts:
     guards:
       - Tests/CodexWatchTests/MenuBarTextTests.swift
       - Tests/CodexWatchTests/AnalyticsDashboardModelTests.swift
+      - Tests/CodexWatchTests/UsageHeatmapLayoutTests.swift
+      - Tests/CodexWatchTests/DashboardTableLayoutTests.swift
       - "manual: reopen and resize the analytics window while inspecting the menu bar on a real Mac"
-    supersedes: [MENU-BAR-001]
+    supersedes: []
     superseded_by: null
-    last_verified_commit: pending
+    last_verified_commit: 5ab8abf
 
   - id: USAGE-ANALYTICS-012
     title: One bounded server dataset powers truthful Codex analytics projections
@@ -240,21 +201,21 @@ contracts:
       - Tests/CodexWatchTests/AnalyticsDashboardModelTests.swift
       - Tests/CodexWatchTests/UsageAnalyticsCSVExporterTests.swift
       - "manual: compare dashboard ranges and data-through labels with the official Codex analytics page"
-    supersedes: [USAGE-ANALYTICS-010]
+    supersedes: []
     superseded_by: null
-    last_verified_commit: pending
+    last_verified_commit: 5ab8abf
 
   - id: REFRESH-COORDINATION-013
     title: Refresh work is coordinated, bounded, and user-selectable
     status: active
-    statement: A single coordinator owns automatic, manual, menu-open, and wake refresh triggers. Repeated automatic triggers coalesce into active work; manual refresh replaces older work and only the newest generation may publish; scheduled delays start after completion; shutdown prevents publication. Fixed choices are Manual, 1, 2, 5, 15, and 30 minutes. Adaptive is the fresh-install default, ranges from 2 to 30 minutes based only on menu interaction, and uses 30 minutes during Low Power Mode or serious thermal pressure. Menu opening refreshes quota only when the last success is older than 60 seconds, and automatic analytics attempts remain at least 15 minutes apart.
+    statement: A single coordinator owns automatic, manual, menu-open, wake, and app-server rate-limit update triggers. Repeated nonmanual triggers coalesce into active work; manual refresh replaces older work and only the newest generation may publish; scheduled delays start after completion; shutdown prevents publication. Fixed choices are Manual, 1, 2, 5, 15, and 30 minutes. Adaptive is the fresh-install default, ranges from 2 to 30 minutes based only on menu interaction, and uses 30 minutes during Low Power Mode or serious thermal pressure. Menu opening and rate-limit notifications are quota-only, while automatic analytics attempts remain at least 15 minutes apart.
     rationale: Generation ownership prevents cancellation churn and stale publication while explicit and adaptive choices control freshness without scanning processes, sessions, or user content.
     source: user-confirmed
     owner: project-maintainer
     risk: high
     scope:
       include: [refresh-coordinator, preferences, stale-state, wake-handling]
-      exclude: [process-scanning, session-scanning, notifications, token-refresh]
+      exclude: [process-scanning, session-scanning, content-driven-refresh, token-refresh]
     examples:
       positive: Two automatic triggers share one fetch, while a later manual trigger replaces it and is the only generation allowed to update the menu and dashboard.
       negative: A repeating timer cancels a request every minute, a stale generation publishes after manual refresh, or adaptive cadence inspects running Codex processes.
@@ -264,12 +225,12 @@ contracts:
       - "manual: exercise every refresh-frequency choice and wake behavior on a real Mac"
     supersedes: []
     superseded_by: null
-    last_verified_commit: pending
+    last_verified_commit: 5ab8abf
 
   - id: PROFILE-LIFETIME-014
     title: Exact Codex profile statistics are separate, bounded, and fail closed
     status: active
-    statement: Codex Watch may perform a bounded read-only GET of /backend-api/wham/profiles/me on the existing authenticated ChatGPT HTTPS host and display independently validated server-reported lifetime tokens, peak daily tokens, longest running turn, streaks, daily token buckets, activity insights, and the 50 highest-ranked Codex invocations in a separate Lifetime dashboard tab. Date-only buckets use fixed POSIX Gregorian UTC semantics, only returned buckets are rendered, and their actual first and last observed dates are stated. The request shares the existing analytics cadence, ephemeral no-cookie session, same-host redirect rule, one-mebibyte response ceiling, and in-memory-only retention. Missing or invalid profile fields remain unavailable and are never inferred from the 365-day analytics dataset or local sessions. Quota, profile, and bounded Usage attempts begin together when the analytics cadence is eligible and fail independently; menu-open refreshes remain quota-only. Profile failure preserves quota and bounded Usage analytics, may preserve the last valid in-memory profile as stale, and never blocks the menu bar. The compact menu hides only codex-spark and codex-spark-weekly presentation rows while retaining those decoded capabilities. Its persistent 30 Days / Lifetime selector exposes exact lifetime headline values without duplicating the dashboard's detailed visualizations. A template pie-chart image and unforced button foreground let macOS render both the status icon and percentage adaptively in light, dark, and selected states.
+    statement: Codex Watch may perform a bounded read-only GET of /backend-api/wham/profiles/me on the existing authenticated ChatGPT HTTPS host and display independently validated server-reported lifetime tokens, peak daily tokens, longest running turn, streaks, daily token buckets, activity insights, and the 50 highest-ranked Codex invocations in a separate Lifetime dashboard tab. Date-only buckets use fixed POSIX Gregorian UTC semantics, only returned buckets are rendered, and their actual first and last observed dates are stated. The request shares the existing analytics cadence, ephemeral no-cookie session, same-host redirect rule, one-mebibyte response ceiling, and in-memory-only retention. Missing or invalid profile fields remain unavailable and are never inferred from the 365-day analytics dataset or local sessions. Quota, profile, and bounded Usage attempts begin together when the analytics cadence is eligible and fail independently; menu-open refreshes remain quota-only. Profile failure preserves quota and bounded Usage analytics, may preserve the last valid in-memory profile as stale, and never blocks the menu bar. The compact menu hides presentation rows whose identifiers equal codex-spark or begin with codex-spark- while retaining those decoded capabilities. Its persistent 30 Days / Lifetime selector exposes exact lifetime headline values without duplicating the dashboard's detailed visualizations. A template pie-chart image and unforced button foreground let macOS render both the status icon and percentage adaptively in light, dark, and selected states.
     rationale: The same-host profile route supplies the exact first-party account totals that bounded historical rows cannot reconstruct, while a distinct surface and independent failure preserve truthful semantics and the narrow privacy boundary.
     source: user-confirmed-and-live-verified
     owner: project-maintainer
@@ -288,4 +249,51 @@ contracts:
       - "manual: compare menu and dashboard Lifetime values with the official Codex profile and inspect the pie icon and percentage in light, dark, and selected states"
     supersedes: []
     superseded_by: null
-    last_verified_commit: pending
+    last_verified_commit: 5ab8abf
+
+  - id: DATA-SOURCE-015
+    title: Official account APIs are preferred without losing bounded compatibility
+    status: active
+    statement: Codex Watch locates only an explicit or standard installed Codex executable, launches its experimental app-server command without a shell, completes the documented initialize handshake over one-mebibyte JSONL lines, times out unanswered requests after 20 seconds, and accepts only documented account response shapes while mapping unknown optional variants to unavailable. Official app-server quota is preferred. The bounded same-host HTTPS quota path is attempted only when app-server quota is unavailable. Rich compatibility profile data is preferred when available, with official account usage as a reduced lifetime fallback; the trailing 365-day Usage dataset remains compatibility-only. App-server account identity must be ChatGPT, and private thread usage, account email, invocation details from account usage, stderr, and raw responses are ignored. Each capability fails independently and missing sources remain unavailable rather than inferred.
+    rationale: Managed Codex authentication supports file, keyring, and automatic credential stores, while a narrow fallback protects the app from an explicitly experimental command and preserves richer bounded analytics.
+    source: user-confirmed-and-official-docs
+    owner: project-maintainer
+    risk: critical
+    scope:
+      include: [app-server, authentication, quota, lifetime, compatibility-fallback]
+      exclude: [shell-execution, websocket-transport, thread-usage, account-email-display, new-network-host]
+    examples:
+      positive: A keyring-authenticated ChatGPT account receives official weekly quota without reading auth.json, while a file-authenticated account can still receive the richer bounded Usage projection.
+      negative: A malformed app-server line is displayed verbatim, an API-key account is treated as ChatGPT, or thread-level usage is retained.
+    guards:
+      - Tests/CodexWatchTests/AppServer/AppServerModelsTests.swift
+      - Tests/CodexWatchTests/AppServer/CodexAppServerClientTests.swift
+      - Tests/CodexWatchTests/AppServer/CodexExecutableLocatorTests.swift
+      - Tests/CodexWatchTests/AppServerUsageAdapterTests.swift
+      - Tests/CodexWatchTests/CodexAccountServiceTests.swift
+      - Tests/CodexWatchTests/CodexDataSourceStrategyTests.swift
+    supersedes: []
+    superseded_by: null
+    last_verified_commit: 5ab8abf
+
+  - id: USER-CONTROLS-016
+    title: Notifications and system controls remain explicit and privacy safe
+    status: active
+    statement: Quota notifications default off, require macOS authorization, fire no more than once per descending 25, 10, 5, and exhausted threshold in a quota window, ignore stale data, and contain no quota percentage, account value, or sensitive error text. Launch at Login changes only after the user selects its menu item. Copy Diagnostics writes only app version, quota-source name, current or stale or unavailable capability states, and the two settings states. Reset-credit consumption is separately governed by RESET-CREDITS-006. No control adds telemetry, background analytics persistence, automatic redemption, or an update service.
+    rationale: High-value alerts and controls can remain useful without placing private account state on the lock screen, clipboard, disk, or a new network destination.
+    source: user-confirmed
+    owner: project-maintainer
+    risk: high
+    scope:
+      include: [notifications, launch-at-login, diagnostics, user-preferences]
+      exclude: [quota-values-in-notifications, automatic-redemption, telemetry, updater, analytics-persistence]
+    examples:
+      positive: At 9 percent remaining, an opted-in user receives a generic low-quota alert once, and copied diagnostics report only that quota is current.
+      negative: A stale snapshot triggers a lock-screen notification containing 9 percent, or diagnostics copy an account ID, path, token total, or raw error.
+    guards:
+      - Tests/CodexWatchTests/RecommendedFeaturesTests.swift
+      - Tests/CodexWatchTests/MenuBarTextTests.swift
+      - "manual: authorize notifications, toggle Launch at Login, and inspect copied diagnostics on a real Mac"
+    supersedes: []
+    superseded_by: null
+    last_verified_commit: 5ab8abf

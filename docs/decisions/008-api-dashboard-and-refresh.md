@@ -5,7 +5,7 @@ supersedes: [004-menu-bar-only, 007-usage-analytics]
 superseded_by: null
 owner: project-maintainer
 created_at: 2026-08-20
-last_verified_commit: pending
+last_verified_commit: 5ab8abf
 ---
 
 # Add a native Codex analytics dashboard and coordinated refresh
@@ -36,4 +36,4 @@ The compact 1.0 menu exposed a truthful 30-day usage summary but could not make 
 
 Codex Watch 1.1 provides a larger Codex-only metrics surface while preserving the authenticated same-host and in-memory privacy boundary. The internal ChatGPT routes may change, so optional fields fail closed, quota remains independently useful, and stale successful analytics stays visibly marked rather than being replaced with fabricated data.
 
-Companion widgets, notifications, a local history index, WebView-only product metrics, and multi-account support require separate decisions and are not part of this release.
+Companion widgets, a local history index, WebView-only product metrics, and multi-account support require separate decisions and are not part of this release. Privacy-safe notifications are governed by decision 011.

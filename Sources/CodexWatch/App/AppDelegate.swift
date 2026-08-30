@@ -21,6 +21,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         let controller = MenuBarController(
+            accountService: CodexAccountService.makeDefault(clientVersion: AppIdentity.version),
+            notificationController: QuotaNotificationController(),
+            launchAtLoginSetting: LaunchAtLoginSetting(),
             refreshFrequency: RefreshFrequency.load(),
             persistRefreshFrequency: { $0.persist() }
         )

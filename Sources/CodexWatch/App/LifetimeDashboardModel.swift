@@ -137,6 +137,7 @@ struct LifetimeDashboardModel: Equatable, Sendable {
     }
 
     private static func duration(_ seconds: Int64) -> String {
+        if seconds < 60 { return "\(max(0, seconds))s" }
         let totalMinutes = seconds / 60
         let hours = totalMinutes / 60
         let minutes = totalMinutes % 60

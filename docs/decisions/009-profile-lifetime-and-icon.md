@@ -5,7 +5,7 @@ supersedes: []
 superseded_by: null
 owner: project-maintainer
 created_at: 2026-08-20
-last_verified_commit: pending
+last_verified_commit: 5ab8abf
 ---
 
 # Add exact lifetime profile statistics and adaptive status presentation
@@ -21,7 +21,7 @@ The bounded 365-day aggregate endpoint cannot reproduce the exact lifetime total
 - Refresh profile statistics only when the existing analytics cadence permits. Profile failure is independent from quota and bounded Usage analytics; preserve last-good in-memory values and mark the analytics surfaces stale.
 - Add a separate Lifetime dashboard tab for the exact headline metrics, daily activity buckets, activity insights, and the 50 highest-ranked Codex invocations. Parse date-only buckets with fixed POSIX Gregorian UTC semantics, render only the returned buckets, and label their actual first and last observed dates. Keep bounded 7/30/90/365 projections and CSV export under Usage.
 - Add a compact `30 Days` / `Lifetime` menu selector, preserve the selection across launches, and show exact Lifetime headline metrics without duplicating the dashboard heatmap or invocation details.
-- Hide only `codex-spark` and `codex-spark-weekly` from the compact menu while preserving them in the decoded capability model.
+- Hide `codex-spark` and every `codex-spark-*` identifier from the compact menu while preserving them in the decoded capability model. The prefix rule covers server-generated duplicate suffixes.
 - Use the simple `chart.pie.fill` SF Symbol as a template status image and leave the button foreground unset so macOS renders the icon and percentage together for light, dark, and selected menu-bar states. Keep the existing approved app artwork and verify every standard ICNS representation.
 
 ## Rejected alternatives

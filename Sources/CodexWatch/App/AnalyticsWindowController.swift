@@ -7,11 +7,21 @@ final class AnalyticsWindowController: NSObject, NSWindowDelegate {
     static let frameAutosaveName = "CodexWatchAnalyticsWindow"
 
     private let model: AnalyticsDashboardModel
+    private let onRefresh: () -> Void
     private var window: NSWindow?
 
-    init(defaults: UserDefaults = .standard, calendar: Calendar = .current) {
+    init(
+        defaults: UserDefaults = .standard,
+        calendar: Calendar = .current,
+        onRefresh: @escaping () -> Void = {}
+    ) {
         model = AnalyticsDashboardModel(defaults: defaults, calendar: calendar)
+        self.onRefresh = onRefresh
         super.init()
+    }
+
+    func requestRefresh() {
+        onRefresh()
     }
 
     func show(
@@ -54,9 +64,11 @@ final class AnalyticsWindowController: NSObject, NSWindowDelegate {
     }
 
     private func makeWindow() -> NSWindow {
-        let rootView = AnalyticsDashboardView(model: model) { [weak self] in
-            self?.exportCSV()
-        }
+        let rootView = AnalyticsDashboardView(
+            model: model,
+            onRefresh: { [weak self] in self?.requestRefresh() },
+            onExport: { [weak self] in self?.exportCSV() }
+        )
         let hostingController = NSHostingController(rootView: rootView)
         let window = NSWindow(contentViewController: hostingController)
         window.title = "Codex Watch Analytics"
