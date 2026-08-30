@@ -5,7 +5,7 @@ supersedes: [004-menu-bar-only, 007-usage-analytics]
 superseded_by: null
 owner: project-maintainer
 created_at: 2026-08-20
-last_verified_commit: 5ab8abf
+last_verified_commit: a3db739
 ---
 
 # Add a native Codex analytics dashboard and coordinated refresh

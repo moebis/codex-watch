@@ -5,7 +5,7 @@ supersedes: []
 superseded_by: null
 owner: project-maintainer
 created_at: 2026-08-20
-last_verified_commit: 5ab8abf
+last_verified_commit: a3db739
 ---
 
 # Add exact lifetime profile statistics and adaptive status presentation

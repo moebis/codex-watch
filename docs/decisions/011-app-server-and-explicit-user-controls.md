@@ -5,7 +5,7 @@ supersedes: []
 superseded_by: null
 owner: project-maintainer
 created_at: 2026-08-30
-last_verified_commit: 5ab8abf
+last_verified_commit: a3db739
 ---
 
 # Prefer managed Codex account APIs and keep user controls explicit

@@ -1,9 +1,9 @@
 ---
 status: current
 owner: project-maintainer
-last_verified_commit: 5ab8abf
-current_release: 1.2.2
-current_build: 19
+last_verified_commit: a3db739
+current_release: 1.3.0
+current_build: 20
 ---
 
 # Codex Watch project memory
@@ -16,9 +16,9 @@ This file is the compact handoff for future work. Read `ARCHITECTURE.md`, the ac
 - Upstream attribution: `https://github.com/smallyunet/codex-notch`
 - Local checkout: `/Users/moebis/Documents/Codex/Codex Watch`
 - Integration policy: work directly on `main`; do not create branches unless the user explicitly reverses that policy.
-- Release 1.2.2 build 19 is commit `5ab8abf`. It was verified as a universal `arm64` and `x86_64` bundle, pushed to `origin/main`, installed, and relaunched on 2026-08-23. Recheck live machine state before relying on installation details.
-- No `v1.2.2` tag or GitHub Release was created because only `main` publication was authorized.
-- The working tree now targets 1.3.0 build 20 with app-server account transport, bounded compatibility fallback, user controls, dashboard layout fixes, and release-script hardening. On 2026-08-30 it passed contracts, 182 tests, complete strict-concurrency diagnostics, AddressSanitizer, ThreadSanitizer, signed local bundle verification, and an extracted universal archive round trip. It is not committed, pushed, installed, tagged, or released; real-menu notification, Launch at Login, reset confirmation, and dashboard visual acceptance remain owner-operated before publication.
+- Release 1.3.0 build 20 is commit `a3db739`. On 2026-08-30 it passed contracts, release-script tests, 182 tests, complete strict-concurrency diagnostics, AddressSanitizer, ThreadSanitizer, signed local bundle verification, and an extracted universal `arm64` and `x86_64` archive round trip. It was pushed to `origin/main`, installed at `/Applications/Codex Watch.app`, and relaunched successfully. Recheck live machine state before relying on installation details.
+- The superseded installed 1.2.2 build 19 bundle was moved to Trash after 1.3.0 postflight passed. Its source remains recoverable at commit `5ab8abf`.
+- No `v1.3.0` tag or GitHub Release was created because only `main` publication and local installation were authorized. Real-menu notification, Launch at Login, reset confirmation, dashboard geometry, CSV save, and first-launch Gatekeeper acceptance remain owner-operated.
 
 ## Durable product decisions
 

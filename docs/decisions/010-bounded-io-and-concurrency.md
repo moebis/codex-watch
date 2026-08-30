@@ -5,7 +5,7 @@ supersedes: []
 superseded_by: null
 owner: project-maintainer
 created_at: 2026-08-23
-last_verified_commit: 5ab8abf
+last_verified_commit: a3db739
 ---
 
 # Bound credential I/O and make concurrency ownership explicit

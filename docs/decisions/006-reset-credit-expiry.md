@@ -5,7 +5,7 @@ supersedes: []
 superseded_by: null
 owner: project-maintainer
 created_at: 2026-07-31
-last_verified_commit: 5ab8abf
+last_verified_commit: a3db739
 ---
 
 # Read reset-credit expiry from the same ChatGPT host
