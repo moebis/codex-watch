@@ -110,7 +110,7 @@ Quota, credentials, analytics, profile statistics, refresh timestamps, and error
 - `swift test` runs deterministic unit and integration tests.
 - `./scripts/verify.sh /private/tmp/codex-watch-verify` validates contracts, tests, release compilation, Info.plist, ICNS representations, signature, and optional architectures outside synced storage.
 - `./scripts/release.sh /private/tmp/codex-watch-release` creates the verified ZIP and SHA-256 file. `ARCHITECTURES="arm64 x86_64"` produces the universal artifact.
-- CI verifies every push to `main`. A `vMAJOR.MINOR.PATCH` tag must match `CFBundleShortVersionString` before the release workflow publishes assets.
+- CI verifies executable changes pushed to `main`; narrowly scoped non-executable authority changes are excluded. A `vMAJOR.MINOR.PATCH` tag must match `CFBundleShortVersionString` before the release workflow publishes assets.
 - Local bundles are ad-hoc signed with hardened runtime. The repository has no Developer ID or notarization credentials.
 - Build and sign outside File Provider or other synced repository paths. Auto-attached Finder metadata makes strict signature verification fail even when the compiled bundle is otherwise valid.
 

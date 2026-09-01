@@ -27,15 +27,9 @@ State what changes, what remains unchanged, what is out of scope, the risk level
 
 ## Validation
 
-```sh
-./scripts/check_contracts.sh
-./scripts/test_release_scripts.sh
-swift test
-./scripts/verify.sh /private/tmp/codex-watch-verify
-./scripts/release.sh /private/tmp/codex-watch-release
-```
+Choose the lowest sufficient verification level from `docs/agent-harness.md`; do not run every entry point for every change. Narrow documentation and copy changes need focused whitespace and authority checks. Behavior changes need their relevant regression tests, widened according to risk. Use `./scripts/verify.sh /private/tmp/codex-watch-verify` for the full app-bundle gate.
 
-`./scripts/release.sh` is only for a distributable local artifact. A pushed version tag triggers the GitHub release workflow.
+Run `./scripts/release.sh /private/tmp/codex-watch-release` only when producing a distributable local artifact. A pushed version tag triggers the GitHub release workflow.
 
 Build and sign outside File Provider or synced repository paths; injected Finder metadata invalidates strict signature verification.
 

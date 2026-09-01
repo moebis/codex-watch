@@ -3,7 +3,25 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "README.md"
+      - "AGENTS.md"
+      - "ARCHITECTURE.md"
+      - "docs/PROJECT_MEMORY.md"
+      - "docs/agent-harness.md"
+      - "docs/decisions/**"
   pull_request:
+    paths-ignore:
+      - "README.md"
+      - "AGENTS.md"
+      - "ARCHITECTURE.md"
+      - "docs/PROJECT_MEMORY.md"
+      - "docs/agent-harness.md"
+      - "docs/decisions/**"
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

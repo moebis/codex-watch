@@ -43,7 +43,7 @@ This file is the compact handoff for future work. Read `ARCHITECTURE.md`, the ac
 - The refresh coordinator's generation model is simpler and safer than independent repeating timers: automatic work coalesces, manual work replaces, and stale generations cannot publish.
 - Leak-tool output from Apple frameworks is not evidence of a project leak. Prefer project-owned stack evidence, AddressSanitizer, ThreadSanitizer, stable runtime sampling, and bounded lifecycle review; never claim absolute leak freedom.
 
-## 1.3.0 working-tree direction
+## 1.3.0 current-release safeguards
 
 - The Codex app-server uses JSONL over stdio and the required initialize handshake. Bound each line while reading, discard child stderr, validate request IDs and documented response variants, and ignore private thread-level account usage.
 - The app-server command is currently experimental. Keep quota fallback independent from compatibility-only Usage analytics so keyring-authenticated users retain official account surfaces and file-authenticated users retain richer views.
