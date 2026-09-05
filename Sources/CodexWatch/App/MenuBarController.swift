@@ -196,7 +196,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             presentation: QuotaProgressPresentation(
                 snapshot: snapshot,
                 error: errorState,
-                now: .now
+                now: .now,
+                showSparkStats: FeaturePreferences.showSparkStats(in: defaults)
             )
         )
         menu.addItem(progressItem)
@@ -239,6 +240,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(actionItem(title: "Refresh Now", action: #selector(refreshNow), keyEquivalent: "r"))
         menu.addItem(refreshFrequencyItem())
+        menu.addItem(toggleItem(
+            title: "Show Codex Spark Stats",
+            action: #selector(toggleSparkStats),
+            isOn: FeaturePreferences.showSparkStats(in: defaults)
+        ))
         menu.addItem(toggleItem(
             title: "Quota Notifications",
             action: #selector(toggleQuotaNotifications),
@@ -392,6 +398,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 do { try await Task.sleep(for: .seconds(30)) } catch { return }
             }
         }
+    }
+
+    @objc private func toggleSparkStats() {
+        FeaturePreferences.setShowSparkStats(!FeaturePreferences.showSparkStats(in: defaults), in: defaults)
+        rebuildMenu()
     }
 
     @objc private func toggleQuotaNotifications() {

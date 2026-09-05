@@ -182,13 +182,13 @@ struct QuotaProgressPresentation: Equatable {
     let statusDetail: String?
     let updatedValue: String?
 
-    init(snapshot: UsageSnapshot?, error: MenuBarErrorState?, now: Date) {
+    init(snapshot: UsageSnapshot?, error: MenuBarErrorState?, now: Date, showSparkStats: Bool = false) {
         planValue = snapshot?.plan?.displayName ?? "Unavailable"
         creditsRemainingValue = snapshot?.creditsRemaining?.displayValue
         resetCreditsValue = snapshot?.availableResetCredits.map { "\($0) available" }
         resetCreditsDetail = MenuBarText.resetCreditExpiryLine(snapshot: snapshot)
         resetCreditsProgress = Self.resetCreditProgress(snapshot: snapshot, now: now)
-        quotaWindows = Self.makeQuotaWindows(snapshot: snapshot, now: now)
+        quotaWindows = Self.makeQuotaWindows(snapshot: snapshot, now: now, showSparkStats: showSparkStats)
         rateLimitReachedValue = snapshot?.rateLimitReachedReason?.displayName
         statusDetail = error.map { MenuBarText.summary(snapshot: nil, error: $0) }
         updatedValue = error.flatMap { _ in
@@ -227,7 +227,8 @@ struct QuotaProgressPresentation: Equatable {
 
     private static func makeQuotaWindows(
         snapshot: UsageSnapshot?,
-        now: Date
+        now: Date,
+        showSparkStats: Bool
     ) -> [QuotaWindowPresentation] {
         guard let snapshot else { return [] }
         var result: [QuotaWindowPresentation] = []
@@ -245,10 +246,18 @@ struct QuotaProgressPresentation: Equatable {
             append(id: window.id, title: title(for: window.kind), window: window)
         }
         for named in snapshot.additionalWindows + snapshot.codeReviewWindows
-            where named.id != "codex-spark" && !named.id.hasPrefix("codex-spark-") {
+            where showSparkStats || !isSpark(named) {
             append(id: named.id, title: named.title, window: named.window)
         }
         return result
+    }
+
+    private static func isSpark(_ named: NamedUsageWindow) -> Bool {
+        // Both legacy IDs and versioned app-server names identify the Codex Spark family.
+        [named.id, named.title].contains { value in
+            let words = value.lowercased().split { !$0.isLetter && !$0.isNumber }
+            return zip(words, words.dropFirst()).contains { $0 == "codex" && $1 == "spark" }
+        }
     }
 
     private static func title(for kind: UsageWindowKind) -> String {

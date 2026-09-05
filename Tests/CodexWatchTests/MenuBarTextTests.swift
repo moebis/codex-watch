@@ -677,6 +677,42 @@ final class MenuBarTextTests: XCTestCase {
         XCTAssertTrue(presentation.quotaWindows.isEmpty)
     }
 
+    func testSparkPreferenceControlsVersionedAndLegacyRowsWithoutChangingBaseQuota() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let sparkNames = [
+            ("codex-spark", "Codex Spark 5-hour"),
+            ("codex-spark-weekly-2", "Codex Spark Weekly"),
+            ("gpt-5-3-codex-spark-primary", "GPT-5.3-Codex-Spark 5-hour"),
+            ("gpt-5-3-codex-spark-secondary", "GPT-5.3-Codex-Spark Weekly"),
+            ("opaque-model-id", "GPT-5.3-CODEX-SPARK Weekly")
+        ]
+        let namedWindows = (sparkNames + [("codex-sparkle", "Codex Sparkle")]).map { id, title in
+            NamedUsageWindow(id: id, title: title, window: UsageWindow(
+                id: id, kind: .weekly, usedPercent: 0,
+                resetAt: now.addingTimeInterval(6 * 86_400), durationSeconds: 7 * 86_400
+            ))
+        }
+        let snapshot = UsageSnapshot(
+            windows: [UsageWindow(id: "weekly", kind: .weekly, usedPercent: 60)],
+            additionalWindows: namedWindows
+        )
+        let hidden = QuotaProgressPresentation(snapshot: snapshot, error: nil, now: now)
+        let shown = QuotaProgressPresentation(snapshot: snapshot, error: nil, now: now, showSparkStats: true)
+
+        XCTAssertEqual(hidden.quotaWindows.map(\.title), ["Weekly", "Codex Sparkle"])
+        XCTAssertEqual(shown.quotaWindows.map(\.title), ["Weekly"] + namedWindows.map(\.title))
+        XCTAssertEqual(hidden.quotaValue, "40%")
+        XCTAssertEqual(shown.quotaValue, hidden.quotaValue)
+        XCTAssertEqual(snapshot.additionalWindows.count, namedWindows.count)
+
+        let hiddenLabels = textValues(in: QuotaProgressMenuView(presentation: hidden))
+        let shownLabels = textValues(in: QuotaProgressMenuView(presentation: shown))
+        for (_, title) in sparkNames {
+            XCTAssertFalse(hiddenLabels.contains("\(title) remaining"))
+            XCTAssertTrue(shownLabels.contains("\(title) remaining"))
+        }
+    }
+
     func testProgressMenuDoesNotRenderSparkQuotaOrPaceLabels() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
         let spark = UsageWindow(
