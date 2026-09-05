@@ -1,9 +1,9 @@
 ---
 status: current
 owner: project-maintainer
-last_verified_commit: a3db739
-current_release: 1.3.0
-current_build: 20
+last_verified_commit: 018225f
+current_release: 1.3.1
+current_build: 21
 ---
 
 # Codex Watch project memory
@@ -16,9 +16,9 @@ This file is the compact handoff for future work. Read `ARCHITECTURE.md`, the ac
 - Upstream attribution: `https://github.com/smallyunet/codex-notch`
 - Local checkout: `/Users/moebis/Documents/Codex/Codex Watch`
 - Integration policy: work directly on `main`; do not create branches unless the user explicitly reverses that policy.
-- Release 1.3.0 build 20 is commit `a3db739`. On 2026-08-30 it passed contracts, release-script tests, 182 tests, complete strict-concurrency diagnostics, AddressSanitizer, ThreadSanitizer, signed local bundle verification, and an extracted universal `arm64` and `x86_64` archive round trip. It was pushed to `origin/main`, installed at `/Applications/Codex Watch.app`, and relaunched successfully. Recheck live machine state before relying on installation details.
-- The superseded installed 1.2.2 build 19 bundle was moved to Trash after 1.3.0 postflight passed. Its source remains recoverable at commit `5ab8abf`.
-- No `v1.3.0` tag or GitHub Release was created because only `main` publication and local installation were authorized. Real-menu notification, Launch at Login, reset confirmation, dashboard geometry, CSV save, and first-launch Gatekeeper acceptance remain owner-operated.
+- Version 1.3.1 build 21 is implemented in commit `018225f`. On 2026-09-05 it passed contracts, release-script regressions, 197 tests, complete strict-concurrency diagnostics, AddressSanitizer, ThreadSanitizer, and signed universal `arm64` and `x86_64` bundle verification. It was installed at `/Applications/Codex Watch.app`, relaunched, and confirmed running with its app-server child. The installed executable matched the verified build. Recheck live machine state before relying on installation details.
+- Stable protocol schema inspection confirmed all four required account methods, including reset consumption, without experimental opt-in. Live reads through the production Swift account service validated base-weekly quota and Lifetime data; no reset was consumed.
+- The previous installed 1.3.0 build 20 bundle was preserved recoverably. No version tag or GitHub Release was created; only local installation and main publication were authorized. The Computer Use bridge timed out, so real-menu notification, Launch at Login, reset confirmation, dashboard geometry, CSV save, and first-launch Gatekeeper acceptance remain owner-operated.
 
 ## Durable product decisions
 
@@ -43,12 +43,15 @@ This file is the compact handoff for future work. Read `ARCHITECTURE.md`, the ac
 - The refresh coordinator's generation model is simpler and safer than independent repeating timers: automatic work coalesces, manual work replaces, and stale generations cannot publish.
 - Leak-tool output from Apple frameworks is not evidence of a project leak. Prefer project-owned stack evidence, AddressSanitizer, ThreadSanitizer, stable runtime sampling, and bounded lifecycle review; never claim absolute leak freedom.
 
-## 1.3.0 current-release safeguards
+## 1.3.1 current-release safeguards
 
-- The Codex app-server uses JSONL over stdio and the required initialize handshake. Bound each line while reading, discard child stderr, validate request IDs and documented response variants, and ignore private thread-level account usage.
+- The Codex app-server uses JSONL over stdio and the required initialize handshake with experimental APIs disabled. Bound each line while reading, discard child stderr, validate request IDs and documented response variants, and ignore private thread-level account usage.
 - The app-server command is currently experimental. Keep quota fallback independent from compatibility-only Usage analytics so keyring-authenticated users retain official account surfaces and file-authenticated users retain richer views.
+- Use POSIX reads for pipe input: Foundation's convenience read can wait to fill a buffer and time out a short initialize reply. Test real child-process output, not only an in-memory transport.
+- Share connection startup, revalidate accounts, clean up failed transports, and recover after a 30-second retry floor. Unsupported optional methods preserve healthy quota connections; uncertain reset requests retain the caller's idempotency key and never retry automatically.
+- Select the explicit base Codex bucket, validate numeric text in full, retain notification history across same-window corrections, and publish quota before slower analytics through the generation guard. Sign-in failure marks retained analytics stale even after quota-only refreshes.
 - A rate-limit update is a quota-only refresh trigger. It coalesces with active work and never forces the bounded analytics request.
-- Release verification must inspect the executable metadata before the one real build, extract the archive into a unique temporary directory, and verify the exact extracted app rather than a sibling or stale bundle.
+- Release packaging first runs `check_release.sh` for contracts, script regressions, and strict concurrency. Build scripts keep Swift intermediates in temporary storage by default. Release verification must inspect the executable metadata before the one real build, extract the archive into a unique temporary directory, and verify the exact extracted app rather than a sibling or stale bundle.
 
 ## Security posture recorded on 2026-08-23
 

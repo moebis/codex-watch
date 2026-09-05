@@ -20,7 +20,7 @@ contracts:
       - Tests/CodexWatchTests/CodexUsageClientTests.swift
     supersedes: []
     superseded_by: null
-    last_verified_commit: a3db739
+    last_verified_commit: 018225f
 
   - id: PRIVACY-BOUNDARY-003
     title: Credentials and private Codex data remain minimally exposed
@@ -45,7 +45,7 @@ contracts:
       - "manual: sensitive string and executable dependency review"
     supersedes: []
     superseded_by: null
-    last_verified_commit: a3db739
+    last_verified_commit: 018225f
 
   - id: PACKAGE-RELEASE-004
     title: Version tags produce verified GitHub release artifacts
@@ -69,7 +69,7 @@ contracts:
       - scripts/verify_app.sh
     supersedes: []
     superseded_by: null
-    last_verified_commit: a3db739
+    last_verified_commit: 018225f
 
   - id: MENU-PROGRESS-005
     title: The status menu visualizes quota and exact time windows
@@ -91,7 +91,7 @@ contracts:
       - "manual: inspect all available progress bars and labels in the open menu on a real Mac"
     supersedes: []
     superseded_by: null
-    last_verified_commit: a3db739
+    last_verified_commit: 018225f
 
   - id: RESET-CREDITS-006
     title: Available rate-limit reset credits are shown without fabrication
@@ -115,7 +115,7 @@ contracts:
       - "manual: inspect the reset-credit row in the open menu on a real Mac"
     supersedes: []
     superseded_by: null
-    last_verified_commit: a3db739
+    last_verified_commit: 018225f
 
   - id: PLAN-DISPLAY-008
     title: The status menu shows only a server-reported recognized ChatGPT plan
@@ -137,7 +137,7 @@ contracts:
       - "manual: inspect the Plan row in the open menu on a real Mac"
     supersedes: []
     superseded_by: null
-    last_verified_commit: a3db739
+    last_verified_commit: 018225f
 
   - id: CREDITS-BALANCE-009
     title: The status menu shows the server-reported ChatGPT credits remaining
@@ -160,7 +160,7 @@ contracts:
       - "manual: compare the Credits remaining row with the ChatGPT Usage Dashboard on a real Mac"
     supersedes: []
     superseded_by: null
-    last_verified_commit: a3db739
+    last_verified_commit: 018225f
 
   - id: DASHBOARD-SURFACE-011
     title: The menu bar remains persistent with one on-demand native analytics window
@@ -184,7 +184,7 @@ contracts:
       - "manual: reopen and resize the analytics window while inspecting the menu bar on a real Mac"
     supersedes: []
     superseded_by: null
-    last_verified_commit: a3db739
+    last_verified_commit: 018225f
 
   - id: USAGE-ANALYTICS-012
     title: One bounded server dataset powers truthful Codex analytics projections
@@ -208,7 +208,7 @@ contracts:
       - "manual: compare dashboard ranges and data-through labels with the official Codex analytics page"
     supersedes: []
     superseded_by: null
-    last_verified_commit: a3db739
+    last_verified_commit: 018225f
 
   - id: REFRESH-COORDINATION-013
     title: Refresh work is coordinated, bounded, and user-selectable
@@ -231,7 +231,7 @@ contracts:
       - "manual: exercise every refresh-frequency choice and wake behavior on a real Mac"
     supersedes: []
     superseded_by: null
-    last_verified_commit: a3db739
+    last_verified_commit: 018225f
 
   - id: PROFILE-LIFETIME-014
     title: Exact Codex profile statistics are separate, bounded, and fail closed
@@ -255,7 +255,7 @@ contracts:
       - "manual: compare menu and dashboard Lifetime values with the official Codex profile and inspect the pie icon and percentage in light, dark, and selected states"
     supersedes: []
     superseded_by: null
-    last_verified_commit: a3db739
+    last_verified_commit: 018225f
 
   - id: DATA-SOURCE-015
     title: Official account APIs are preferred without losing bounded compatibility
@@ -282,7 +282,7 @@ contracts:
       - Tests/CodexWatchTests/CodexDataSourceStrategyTests.swift
     supersedes: []
     superseded_by: null
-    last_verified_commit: a3db739
+    last_verified_commit: 018225f
 
   - id: USER-CONTROLS-016
     title: Notifications and system controls remain explicit and privacy safe
@@ -304,4 +304,4 @@ contracts:
       - "manual: authorize notifications, toggle Launch at Login, and inspect copied diagnostics on a real Mac"
     supersedes: []
     superseded_by: null
-    last_verified_commit: a3db739
+    last_verified_commit: 018225f

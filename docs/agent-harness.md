@@ -2,7 +2,7 @@
 status: active
 owner: project-maintainer
 created_at: 2026-07-19
-last_verified_commit: a3db739
+last_verified_commit: 018225f
 ---
 
 # Codex Watch change harness
