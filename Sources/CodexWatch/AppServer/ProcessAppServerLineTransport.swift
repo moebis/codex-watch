@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 actor ProcessAppServerLineTransport: AppServerLineTransport {
@@ -85,13 +86,12 @@ actor ProcessAppServerLineTransport: AppServerLineTransport {
 
         try? standardInput?.close()
         standardInput = nil
-        try? standardOutput?.close()
-        standardOutput = nil
-
         if process?.isRunning == true {
             process?.terminate()
         }
         process = nil
+        try? standardOutput?.close()
+        standardOutput = nil
     }
 
     private nonisolated static func readLines(
@@ -109,14 +109,23 @@ actor ProcessAppServerLineTransport: AppServerLineTransport {
                     return
                 }
                 let readCount = min(64 * 1_024, remainingThroughDetectionByte)
-                guard let chunk = try handle.read(upToCount: readCount), !chunk.isEmpty else {
+                // FileHandle.read(upToCount:) may wait to fill the buffer on a pipe.
+                // POSIX read returns currently available bytes, so a short JSONL reply
+                // is delivered while the long-lived server keeps stdout open.
+                var chunk = [UInt8](repeating: 0, count: readCount)
+                let count = Darwin.read(handle.fileDescriptor, &chunk, readCount)
+                if count < 0 {
+                    if errno == EINTR { continue }
+                    throw AppServerError.transportFailure
+                }
+                guard count > 0 else {
                     if !buffer.isEmpty {
                         await receiveLine(strippingCarriageReturn(from: buffer))
                     }
                     await termination(nil)
                     return
                 }
-                buffer.append(chunk)
+                buffer.append(contentsOf: chunk.prefix(count))
 
                 while let newlineIndex = buffer.firstIndex(of: 0x0A) {
                     let line = Data(buffer[..<newlineIndex])

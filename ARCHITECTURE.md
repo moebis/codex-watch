@@ -58,7 +58,7 @@ No response, token, account identifier, or analytics dataset is logged or cached
 
 ## Trust and privacy boundaries
 
-- `CodexAppServerClient` launches a locally installed Codex executable with the `app-server` command, completes the required initialize handshake, and permits only the account methods Codex Watch uses. Stdio messages have a one-mebibyte ceiling and each request has a 20-second timeout. Child stderr is discarded so private server diagnostics cannot enter app output.
+- `CodexAppServerClient` launches a locally installed Codex executable with the `app-server` command, completes the required initialize handshake with experimental APIs disabled, and permits only the account methods Codex Watch uses. Short pipe replies are consumed with POSIX reads without waiting for a full buffer or EOF. Stdio messages have a one-mebibyte ceiling and each request has a 20-second timeout. Child stderr is discarded so private server diagnostics cannot enter app output.
 - The app-server command is currently documented as experimental. Codex Watch therefore preserves its bounded same-host HTTPS path as a compatibility fallback and as the richer Usage analytics source.
 - Managed ChatGPT authentication is owned by Codex and may use its configured file, keyring, or automatic credential store. Codex Watch does not read or copy keyring credentials.
 - When available, `CodexAuthReader` reads only `auth.json`, requires a regular file, and enforces the one-mebibyte ceiling while reading from the opened handle. The read runs at utility priority outside the main actor.
@@ -81,11 +81,13 @@ No response, token, account identifier, or analytics dataset is logged or cached
 - Menu opening is quota-only and refreshes only when the last successful quota snapshot is older than 60 seconds.
 - App-server rate-limit update notifications trigger a coalesced quota-only refresh. They never bypass generation ownership or the analytics cadence.
 - Scheduled delays begin after fetch completion. `stop()` cancels scheduled and active tasks, invalidates the session, removes the status item, and prevents later publication.
-- Authentication failure may preserve prior in-memory analytics and profile values, but both surfaces must be marked stale.
+- Authentication failure may preserve prior in-memory analytics and profile values, but both surfaces must be marked stale, including after a quota-only refresh.
+- Quota publishes before eligible analytics completes, through the same generation guard. Old or stopped generations cannot publish partial results.
+- Account operations share one connection startup. Failed connections are cleaned up and replaced after a 30-second retry floor; the update observer resubscribes on the same bounded cadence. Account identity is revalidated before each operation. Optional unsupported methods do not discard a healthy quota connection, and uncertain reset mutations are never retried automatically.
 
 ## Presentation semantics
 
-- The menu-bar number is always the rounded remaining base-weekly percentage. It never switches to a rolling, Spark, or model-specific limit.
+- The app-server adapter prefers the explicit `codex` map entry and accepts only a base or unidentified legacy bucket. The menu-bar number is always the rounded remaining base-weekly percentage. It never switches to a rolling, Spark, or model-specific limit.
 - The status item uses the template `chart.pie.fill` SF Symbol and native foreground rendering so both icon and percentage adapt to light, dark, and selected materials.
 - Spark capabilities remain decoded but any identifier equal to `codex-spark` or beginning with `codex-spark-` is omitted from the compact menu, including server-generated duplicate suffixes.
 - Usage and Lifetime are distinct sources. The bounded 365-day dataset powers 7/30/90/365 projections; exact lifetime totals come from the profile route.
@@ -109,6 +111,8 @@ Quota, credentials, analytics, profile statistics, refresh timestamps, and error
 - `./scripts/check_contracts.sh` validates the active behavior-contract schema.
 - `swift test` runs deterministic unit and integration tests.
 - `./scripts/verify.sh /private/tmp/codex-watch-verify` validates contracts, tests, release compilation, Info.plist, ICNS representations, signature, and optional architectures outside synced storage.
+- `./scripts/check_release.sh` gates packaging on contracts, release-script regressions, and complete strict-concurrency compilation.
+- Build scripts use `CODEX_WATCH_SCRATCH_PATH`, defaulting to temporary storage, for Swift build intermediates.
 - `./scripts/release.sh /private/tmp/codex-watch-release` creates the verified ZIP and SHA-256 file. `ARCHITECTURES="arm64 x86_64"` produces the universal artifact.
 - CI verifies executable changes pushed to `main`; narrowly scoped non-executable authority changes are excluded. A `vMAJOR.MINOR.PATCH` tag must match `CFBundleShortVersionString` before the release workflow publishes assets.
 - Local bundles are ad-hoc signed with hardened runtime. The repository has no Developer ID or notarization credentials.

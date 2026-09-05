@@ -127,6 +127,14 @@ final class RefreshCoordinator {
         }
     }
 
+    func publishPartial(_ result: RefreshResult, generation requestGeneration: Int) {
+        guard !stopped, activeTask != nil, requestGeneration == generation else { return }
+        if let quotaFetchedAt = result.quotaFetchedAt {
+            lastSuccessfulQuotaAt = quotaFetchedAt
+        }
+        publish(result)
+    }
+
     private func finish(result: RefreshResult, generation requestGeneration: Int) {
         guard !stopped, requestGeneration == generation else { return }
         activeTask = nil

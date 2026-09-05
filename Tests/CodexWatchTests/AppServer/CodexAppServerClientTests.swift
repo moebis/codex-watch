@@ -17,7 +17,7 @@ final class CodexAppServerClientTests: XCTestCase {
         XCTAssertEqual(clientInfo.title, "Codex Watch")
         XCTAssertEqual(clientInfo.version, "1.3.0")
         let capabilities = try XCTUnwrap(params.capabilities)
-        XCTAssertEqual(capabilities.experimentalApi, true)
+        XCTAssertEqual(capabilities.experimentalApi, false)
         XCTAssertEqual(capabilities.requestAttestation, false)
 
         await transport.deliver(
@@ -246,6 +246,18 @@ final class CodexAppServerClientTests: XCTestCase {
         await assertTask(task, failsWith: .invalidIdempotencyKey)
         let sentCount = await transport.sentCount()
         XCTAssertEqual(sentCount, 2)
+    }
+
+    func testReaderFailureCleansTransportEvenAfterClientHasTerminated() async throws {
+        let transport = InMemoryAppServerLineTransport()
+        let client = makeClient(transport: transport)
+        try await start(client, transport: transport)
+        await transport.terminate()
+        let stopped = await transport.wasStopped()
+        XCTAssertTrue(stopped)
+        await client.stop()
+        let stillStopped = await transport.wasStopped()
+        XCTAssertTrue(stillStopped)
     }
 
     private func makeClient(

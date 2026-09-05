@@ -52,6 +52,7 @@ For L1 and above, state the observable change, preserved contracts, excluded wor
 | Release scripts | `./scripts/test_release_scripts.sh` | Guard build count, isolated archive extraction, exact verification target, cleanup, and portable checksum output |
 | Fast | `swift test` | Run deterministic tests |
 | Full | `./scripts/verify.sh /private/tmp/codex-watch-verify` | Test, build, and inspect the app bundle outside synced storage |
+| Release prerequisites | `./scripts/check_release.sh` | Contracts, release-script regressions, and strict-concurrency compilation before packaging |
 | Release | `./scripts/release.sh /private/tmp/codex-watch-release` | Produce a verified ZIP and SHA-256 file outside synced storage |
 | Concurrency | `swift build -Xswiftc -strict-concurrency=complete -Xswiftc -warn-concurrency -Xswiftc -warnings-as-errors` | Enforce actor and sendability boundaries |
 | Memory | `swift test --sanitize=address` | Detect covered memory-safety failures |

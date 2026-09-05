@@ -16,9 +16,10 @@ Codex Watch previously depended on direct access to `auth.json`. Current Codex d
 
 ## Decision
 
-- Launch only a known installed Codex executable directly, without a shell, using `app-server` and the documented initialize handshake over JSONL stdio. Bound each input and output line to one mebibyte, time out unanswered requests after 20 seconds, discard child stderr, validate documented response shapes, and ignore account email and thread-level usage.
+- Launch only a known installed Codex executable directly, without a shell, using `app-server` and the documented initialize handshake over JSONL stdio with `experimentalApi` disabled. Bound each input and output line to one mebibyte, time out unanswered requests after 20 seconds, discard child stderr, validate documented response shapes, and ignore account email and thread-level usage.
 - Require a ChatGPT account. Prefer app-server quota and use bounded same-host HTTPS quota only when the official source is unavailable. Prefer the richer compatibility profile when available, then fall back to the reduced official account-usage summary. Keep the trailing 365-day Usage dataset compatibility-only.
-- Treat app-server rate-limit updates as coalesced quota-only refresh triggers under the existing generation coordinator.
+- Treat app-server rate-limit updates as coalesced quota-only refresh triggers under the existing generation coordinator. Failed connections are cleaned up and replaced after a 30-second retry floor; observation resubscribes with the same bounded cadence. Revalidate the account before operations and never retry a reset mutation automatically.
+- Publish quota independently of slow analytics through the coordinator generation guard. Authentication loss marks retained analytics stale even when those capabilities were not attempted.
 - Permit reset-credit consumption only through the documented app-server method after an explicit confirmation. Generate one UUID idempotency key, preserve an uncertain request only in memory for retry, clear it only after an exact outcome, and refetch after exact outcomes.
 - Keep quota notifications off by default. Require macOS authorization, suppress stale data and repeat alerts, and use generic copy without percentages or account values.
 - Expose Launch at Login through `SMAppService.mainApp`. Copy Diagnostics may include only version, quota-source name, capability freshness, and settings state.

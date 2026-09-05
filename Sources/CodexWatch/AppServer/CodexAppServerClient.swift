@@ -16,7 +16,7 @@ actor CodexAppServerClient {
 
     private struct InitializeParams: Encodable {
         struct Capabilities: Encodable {
-            let experimentalApi = true
+            let experimentalApi = false
             let requestAttestation = false
         }
 
@@ -160,6 +160,8 @@ actor CodexAppServerClient {
 
     func stop() async {
         await terminate(with: .terminated, stopTransport: true)
+        // Cleanup remains idempotent even when a prior callback ended the client.
+        await transport.stop()
     }
 
     private func request<Response: Decodable, Params: Encodable>(
@@ -222,6 +224,7 @@ actor CodexAppServerClient {
     }
 
     private func send(_ line: Data, for id: Int) async {
+        guard pending[id] != nil else { return }
         do {
             try await transport.send(line)
         } catch {
@@ -317,7 +320,7 @@ actor CodexAppServerClient {
     private func transportTerminated(_ error: Error?) async {
         await terminate(
             with: error.map(sanitize) ?? .terminated,
-            stopTransport: false
+            stopTransport: true
         )
     }
 

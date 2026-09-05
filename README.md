@@ -1,6 +1,6 @@
 # Codex Watch
 
-Codex Watch is a native macOS menu bar app for monitoring ChatGPT Codex quota, token usage, and activity. Version 1.3.0 prefers Codex's managed-auth app-server account APIs, preserves a bounded compatibility path for richer analytics, and adds explicit quota alerts and account controls while keeping the menu-bar percentage focused on the base weekly quota.
+Codex Watch is a native macOS menu bar app for monitoring ChatGPT Codex quota, token usage, and activity. Version 1.3.1 prefers Codex's managed-auth app-server account APIs, preserves a bounded compatibility path for richer analytics, and adds explicit quota alerts and account controls while keeping the menu-bar percentage focused on the base weekly quota.
 
 ## What it shows
 
@@ -32,7 +32,7 @@ The menu includes:
 
 Adaptive refresh is the default for a fresh preference domain. It checks every 2 minutes after recent menu interaction, then backs off to 5, 15, or 30 minutes. Low Power Mode and serious or critical thermal pressure use 30 minutes. Opening the menu requests fresh quota only when the last successful snapshot is older than 60 seconds. Bounded Usage analytics and Lifetime profile statistics are fetched on manual refresh and no more than once every 15 minutes automatically.
 
-Automatic triggers share active work. A manual refresh replaces older background work, and stale generations cannot publish. Quota errors preserve and dim the last successful percentage with an `Updated … ago` label. Usage and Lifetime failures are independent: each preserves its own last successful in-memory result and marks only that dashboard surface stale.
+Quota publishes as soon as it completes, without waiting for slower analytics. Failed app-server connections recover on a bounded 30-second retry cadence. Automatic triggers share active work. A manual refresh replaces older background work, and stale generations cannot publish. Quota errors preserve and dim the last successful percentage with an `Updated … ago` label. Usage and Lifetime failures are independent: each preserves its own last successful in-memory result and marks only that dashboard surface stale.
 
 Codex app-server rate-limit updates request a coalesced quota-only refresh. The dashboard Refresh control invokes the same manual generation as the menu. Its heatmap uses weekday rows and week columns, and wide data tables scroll rather than clipping when the window is narrow.
 
@@ -42,7 +42,7 @@ Codex app-server rate-limit updates request a coalesced quota-only refresh. The 
 
 ## Authentication and privacy
 
-Codex Watch first launches an installed Codex executable's `app-server` command and uses its managed ChatGPT authentication for account identity, quota, lifetime summary, live rate-limit updates, and confirmed reset-credit use. This supports Codex's configured credential store without copying credentials into Codex Watch. The app-server interface is currently documented as experimental, so Codex Watch fails closed and retains a compatibility path.
+Codex Watch first launches an installed Codex executable's `app-server` command and uses its managed ChatGPT authentication for account identity, quota, lifetime summary, live rate-limit updates, and confirmed reset-credit use. This supports Codex's configured credential store without copying credentials into Codex Watch. The app-server command is currently documented as experimental; Codex Watch disables experimental protocol APIs, fails closed, and retains a compatibility path.
 
 For richer 365-day Usage analytics and profile details, Codex Watch optionally reads `tokens.access_token` and `tokens.account_id` from `CODEX_HOME/auth.json`; when `CODEX_HOME` is unset, it checks `~/.codex/auth.json`. If file credentials are unavailable, official app-server quota and lifetime summaries remain usable while the richer compatibility-only surfaces show unavailable.
 
@@ -97,6 +97,8 @@ Create a local universal release archive:
 ARCHITECTURES="arm64 x86_64" ARCHIVE_ARCH=universal \
 ./scripts/release.sh /private/tmp/codex-watch-release
 ```
+
+Swift build intermediates use temporary storage by default; `CODEX_WATCH_SCRATCH_PATH` can select another nonsynced build directory. Release packaging first checks contracts, release-script regressions, and strict concurrency.
 
 Keep signing output outside File Provider or other synced folders. Those services can attach Finder metadata to an app bundle after creation, which makes strict code-signature verification fail even when the source and build are valid.
 

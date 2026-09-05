@@ -28,7 +28,6 @@ struct QuotaNotificationPolicy: Sendable {
 
         let remaining = min(100, max(0, remainingPercent))
         guard let threshold = Self.thresholds.first(where: { remaining <= Double($0) }) else {
-            lastNotifiedThreshold = nil
             return nil
         }
         guard lastNotifiedThreshold == nil || threshold < lastNotifiedThreshold! else { return nil }

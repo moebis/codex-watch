@@ -92,16 +92,31 @@ enum RefreshBatch {
         requestedAt: Date,
         quota: @Sendable @escaping () async -> QuotaRefreshAttempt,
         analytics: @Sendable @escaping () async -> CapabilityRefreshAttempt<UsageAnalyticsDataset>,
-        profile: @Sendable @escaping () async -> CapabilityRefreshAttempt<CodexProfileStats>
+        profile: @Sendable @escaping () async -> CapabilityRefreshAttempt<CodexProfileStats>,
+        onQuota: (@Sendable (RefreshResult) async -> Void)? = nil
     ) async -> RefreshResult {
-        async let quotaAttempt = quota()
+        async let fetchedQuota = quota()
+        let quotaAttempt: QuotaRefreshAttempt
         let analyticsAttempt: CapabilityRefreshAttempt<UsageAnalyticsDataset>
         let profileAttempt: CapabilityRefreshAttempt<CodexProfileStats>
         if includeAnalytics {
             async let fetchedAnalytics = analytics()
             async let fetchedProfile = profile()
+            quotaAttempt = await fetchedQuota
+            if let onQuota, !Task.isCancelled {
+                await onQuota(resolve(
+                    previousSnapshot: previousSnapshot,
+                    analyticsWasStale: analyticsWasStale,
+                    profileWasStale: profileWasStale,
+                    requestedAt: requestedAt,
+                    quotaAttempt: quotaAttempt,
+                    analyticsAttempt: .notAttempted,
+                    profileAttempt: .notAttempted
+                ))
+            }
             (analyticsAttempt, profileAttempt) = await (fetchedAnalytics, fetchedProfile)
         } else {
+            quotaAttempt = await fetchedQuota
             analyticsAttempt = .notAttempted
             profileAttempt = .notAttempted
         }
@@ -111,7 +126,7 @@ enum RefreshBatch {
             analyticsWasStale: analyticsWasStale,
             profileWasStale: profileWasStale,
             requestedAt: requestedAt,
-            quotaAttempt: await quotaAttempt,
+            quotaAttempt: quotaAttempt,
             analyticsAttempt: analyticsAttempt,
             profileAttempt: profileAttempt
         )
@@ -170,8 +185,10 @@ enum RefreshBatch {
         return RefreshResult(
             snapshot: combinedSnapshot,
             error: error,
-            analyticsStale: analyticsState.isStale,
-            profileStale: profileState.isStale,
+            analyticsStale: analyticsState.isStale
+                || (error == .signInRequired && analyticsState.value != nil),
+            profileStale: profileState.isStale
+                || (error == .signInRequired && profileState.value != nil),
             quotaFetchedAt: quotaFetchedAt
         )
     }

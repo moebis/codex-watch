@@ -7,15 +7,17 @@ enum AppServerUsageAdapter {
         from response: AppServerRateLimitsResponse,
         fetchedAt: Date
     ) -> UsageSnapshot {
-        let base = response.rateLimits
+        let mappedBase = response.rateLimitsByLimitID?["codex"]
+        let candidate = mappedBase ?? response.rateLimits
+        let base = candidate.limitID == nil || candidate.limitID == "codex" ? candidate : nil
         let windows = [
-            makeWindow(id: "primary", value: base.primary),
-            makeWindow(id: "secondary", value: base.secondary)
+            makeWindow(id: "primary", value: base?.primary),
+            makeWindow(id: "secondary", value: base?.secondary)
         ].compactMap { $0 }
 
         var additionalWindows: [NamedUsageWindow] = []
         for (key, value) in (response.rateLimitsByLimitID ?? [:]).sorted(by: { $0.key < $1.key }) {
-            if key == base.limitID || key == "codex" { continue }
+            if key == base?.limitID || key == "codex" { continue }
             let baseID = boundedSlug(value.limitID ?? key)
             guard !baseID.isEmpty else { continue }
             for (role, source) in [("primary", value.primary), ("secondary", value.secondary)] {
@@ -33,13 +35,13 @@ enum AppServerUsageAdapter {
         }
 
         return UsageSnapshot(
-            plan: base.planType.flatMap { ChatGPTPlan(apiValue: $0.rawValue) },
-            creditsRemaining: credits(from: base.credits),
+            plan: base?.planType.flatMap { ChatGPTPlan(apiValue: $0.rawValue) },
+            creditsRemaining: credits(from: base?.credits),
             windows: windows,
             additionalWindows: additionalWindows,
             resetCredits: resetCredits(from: response.resetCredits?.credits),
-            spendControl: spendControl(from: base.individualLimit),
-            rateLimitReachedReason: reachedReason(from: base.reachedReason),
+            spendControl: spendControl(from: base?.individualLimit),
+            rateLimitReachedReason: reachedReason(from: base?.reachedReason),
             availableResetCredits: availableResetCredits(from: response.resetCredits),
             fetchedAt: fetchedAt,
             source: .appServer
@@ -96,10 +98,7 @@ enum AppServerUsageAdapter {
               let balance = value.balance?.trimmingCharacters(in: .whitespacesAndNewlines),
               !balance.isEmpty,
               balance.utf8.count <= 64,
-              let decimal = Decimal(
-                  string: balance,
-                  locale: Locale(identifier: "en_US_POSIX")
-              ),
+              let decimal = ValidatedDecimal.parse(balance),
               !decimal.isNaN else { return nil }
         return .balance(balance)
     }
@@ -108,16 +107,11 @@ enum AppServerUsageAdapter {
         from value: AppServerSpendControlLimit?
     ) -> SpendControlSummary? {
         guard let value,
-              let limit = Decimal(
-                  string: value.limit,
-                  locale: Locale(identifier: "en_US_POSIX")
-              ),
-              let used = Decimal(
-                  string: value.used,
-                  locale: Locale(identifier: "en_US_POSIX")
-              ),
+              let limit = ValidatedDecimal.parse(value.limit),
+              let used = ValidatedDecimal.parse(value.used),
               !limit.isNaN,
               !used.isNaN,
+              limit >= 0, used >= 0,
               value.remainingPercent.isFinite else { return nil }
         return SpendControlSummary(
             limit: limit,
@@ -183,14 +177,7 @@ enum AppServerUsageAdapter {
     }
 
     private static func profileDate(_ value: String) -> Date? {
-        guard value.utf8.count == 10 else { return nil }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.isLenient = false
-        return formatter.date(from: value)
+        CodexProfileDateParser.parse(value)
     }
 
     private static func date(from timestamp: Int64?) -> Date? {

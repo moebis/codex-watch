@@ -14,6 +14,8 @@ if [[ -n "${GITHUB_REF_NAME:-}" && "$GITHUB_REF_NAME" != "v$VERSION" ]]; then
     exit 1
 fi
 
+"$ROOT_DIR/scripts/check_release.sh"
+
 RUN_TESTS="${RUN_TESTS:-1}" \
     "$ROOT_DIR/scripts/build_app.sh" "$DIST_DIR"
 

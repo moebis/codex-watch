@@ -15,7 +15,20 @@ final class RecommendedFeaturesTests: XCTestCase {
         XCTAssertNil(policy.consume(remainingPercent: 0, isFresh: true))
 
         XCTAssertNil(policy.consume(remainingPercent: 80, isFresh: true))
-        XCTAssertEqual(policy.consume(remainingPercent: 24, isFresh: true)?.threshold, 25)
+        XCTAssertNil(policy.consume(remainingPercent: 24, isFresh: true))
+        XCTAssertEqual(policy.consume(
+            remainingPercent: 24, isFresh: true,
+            windowResetAt: Date(timeIntervalSince1970: 2_000)
+        )?.threshold, 25)
+    }
+
+    func testCorrectionDoesNotRepeatThresholdInTheSameWindow() {
+        var policy = QuotaNotificationPolicy()
+        let reset = Date(timeIntervalSince1970: 1_000)
+        XCTAssertEqual(policy.consume(remainingPercent: 24, isFresh: true, windowResetAt: reset)?.threshold, 25)
+        XCTAssertNil(policy.consume(remainingPercent: 26, isFresh: true, windowResetAt: reset))
+        XCTAssertNil(policy.consume(remainingPercent: 24, isFresh: true, windowResetAt: reset))
+        XCTAssertEqual(policy.consume(remainingPercent: 9, isFresh: true, windowResetAt: reset)?.threshold, 10)
     }
 
     func testQuotaNotificationsIgnoreStaleOrUnavailableQuota() {

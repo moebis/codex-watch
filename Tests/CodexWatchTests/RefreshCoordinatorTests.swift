@@ -336,6 +336,31 @@ final class RefreshCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testPartialResultsObeyGenerationAndShutdownOwnership() async throws {
+        let gate = FetchGate()
+        var publications = 0
+        let coordinator = makeCoordinator(gate: gate, publish: { _ in publications += 1 })
+        let result = RefreshResult(snapshot: nil, error: nil, analyticsStale: false)
+        coordinator.trigger(.automatic)
+        await gate.waitForFetchCount(1)
+        let first = await gate.lastRequest()!
+        coordinator.publishPartial(result, generation: first.generation)
+        XCTAssertEqual(publications, 1)
+        coordinator.trigger(.manual)
+        await gate.waitForFetchCount(2)
+        let second = await gate.lastRequest()!
+        coordinator.publishPartial(result, generation: first.generation)
+        XCTAssertEqual(publications, 1)
+        coordinator.publishPartial(result, generation: second.generation)
+        XCTAssertEqual(publications, 2)
+        coordinator.stop()
+        coordinator.publishPartial(result, generation: second.generation)
+        XCTAssertEqual(publications, 2)
+        await gate.release(trigger: .automatic)
+        await gate.release(trigger: .manual)
+    }
+
+    @MainActor
     private func makeCoordinator(
         gate: FetchGate,
         frequency: RefreshFrequency = .manual,

@@ -10,13 +10,15 @@ SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 RUN_TESTS="${RUN_TESTS:-1}"
 ARCHITECTURES="${ARCHITECTURES:-}"
 
+export CODEX_WATCH_SCRATCH_PATH="${CODEX_WATCH_SCRATCH_PATH:-${TMPDIR:-/tmp}/codex-watch-swift-build}"
+
 cd "$ROOT_DIR"
 
 if [[ "$RUN_TESTS" == "1" ]]; then
-    swift test
+    swift test --scratch-path "$CODEX_WATCH_SCRATCH_PATH"
 fi
 
-BUILD_ARGS=(-c "$CONFIGURATION" --product "$PRODUCT_NAME")
+BUILD_ARGS=(--scratch-path "$CODEX_WATCH_SCRATCH_PATH" -c "$CONFIGURATION" --product "$PRODUCT_NAME")
 if [[ -n "$ARCHITECTURES" ]]; then
     read -r -a ARCHITECTURE_LIST <<< "$ARCHITECTURES"
     for ARCHITECTURE in "${ARCHITECTURE_LIST[@]}"; do

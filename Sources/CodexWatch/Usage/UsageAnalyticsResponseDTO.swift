@@ -268,10 +268,7 @@ struct UsageAnalyticsModelDTO: Decodable {
         guard let value = try? container.decodeIfPresent(String.self, forKey: key) else {
             return nil
         }
-        return Decimal(
-            string: value.trimmingCharacters(in: .whitespacesAndNewlines),
-            locale: Locale(identifier: "en_US_POSIX")
-        )
+        return ValidatedDecimal.parse(value)
     }
 }
 

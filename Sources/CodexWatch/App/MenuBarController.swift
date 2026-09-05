@@ -145,6 +145,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                     legacy: legacy,
                     fetchedAt: request.requestedAt
                 )
+            },
+            onQuota: { [weak self] result in
+                await self?.coordinator.publishPartial(result, generation: request.generation)
             }
         )
     }
@@ -377,10 +380,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private func observeRateLimitUpdates() {
         guard let accountService else { return }
         rateLimitUpdatesTask = Task { [weak self] in
-            guard let stream = try? await accountService.rateLimitUpdates() else { return }
-            for await _ in stream {
-                guard !Task.isCancelled else { return }
-                self?.coordinator.trigger(.rateLimitUpdated)
+            while !Task.isCancelled {
+                if let stream = try? await accountService.rateLimitUpdates() {
+                    guard !Task.isCancelled else { return }
+                    self?.coordinator.trigger(.rateLimitUpdated)
+                    for await _ in stream {
+                        guard !Task.isCancelled else { return }
+                        self?.coordinator.trigger(.rateLimitUpdated)
+                    }
+                }
+                do { try await Task.sleep(for: .seconds(30)) } catch { return }
             }
         }
     }

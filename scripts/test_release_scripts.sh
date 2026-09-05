@@ -101,9 +101,18 @@ make_release_fixture() {
     cp "$ROOT_DIR/scripts/release.sh" "$fixture/scripts/release.sh"
     : > "$fixture/Resources/Info.plist"
 
+    cat > "$fixture/scripts/check_release.sh" <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "${FAIL_RELEASE_GATE:-0}" != "1" ]] || exit 9
+printf 'passed\n' > "$(dirname "$0")/gate-passed"
+SCRIPT
+    chmod +x "$fixture/scripts/check_release.sh"
+
     cat > "$fixture/scripts/build_app.sh" <<'SCRIPT'
 #!/usr/bin/env bash
 set -euo pipefail
+[[ -f "$(dirname "$0")/gate-passed" ]] || { echo 'release gate was skipped' >&2; exit 1; }
 mkdir -p "$1/Codex Watch.app/Contents"
 printf 'archive payload\n' > "$1/Codex Watch.app/Contents/payload"
 SCRIPT
@@ -244,6 +253,17 @@ test_release_rejects_extra_top_level_archive_content() {
     }
 }
 
+test_release_gate_failure_prevents_packaging() {
+    local fixture="$TEST_ROOT/release-gate-failure"
+    make_release_fixture "$fixture"
+    if PATH="$fixture/fake-bin:/usr/bin:/bin" FAIL_RELEASE_GATE=1 \
+        "$fixture/scripts/release.sh" "$fixture/dist"; then
+        fail "release accepted a failed prerequisite"
+    fi
+    [[ ! -d "$fixture/dist" ]] || fail "release packaged an app before prerequisites passed"
+}
+
+test_release_gate_failure_prevents_packaging
 test_build_queries_path_then_builds_once
 test_release_verifies_exact_archive_payload
 test_release_rejects_extra_top_level_archive_content

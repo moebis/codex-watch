@@ -292,7 +292,7 @@ struct CreditsDTO: Decodable {
         let trimmed = balance.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
               trimmed.count <= 64,
-              let value = Decimal(string: trimmed, locale: Locale(identifier: "en_US_POSIX")),
+              let value = ValidatedDecimal.parse(trimmed),
               !value.isNaN else { return nil }
         return .balance(trimmed)
     }
@@ -447,10 +447,7 @@ struct SpendControlLimitDTO: Decodable {
         guard let value = try? container.decodeIfPresent(String.self, forKey: key) else {
             return nil
         }
-        return Decimal(
-            string: value.trimmingCharacters(in: .whitespacesAndNewlines),
-            locale: Locale(identifier: "en_US_POSIX")
-        )
+        return ValidatedDecimal.parse(value)
     }
 
     private static func decodeDouble(

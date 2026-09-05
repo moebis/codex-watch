@@ -2,7 +2,7 @@ contracts:
   - id: QUOTA-SEMANTICS-002
     title: The displayed number is the remaining weekly percentage
     status: active
-    statement: The menu bar prefers a window classified as weekly and displays 100 minus its clamped used percentage, rounded to the nearest integer. Missing data is shown as an em dash and is never fabricated from another window.
+    statement: The app-server source first selects the explicit codex bucket when present and otherwise accepts only a base or unidentified legacy bucket. The menu bar prefers a window classified as weekly and displays 100 minus its clamped used percentage, rounded to the nearest integer. Missing data is shown as an em dash and is never fabricated from another window.
     rationale: Users need one stable number whose meaning does not change when the endpoint returns multiple windows.
     source: user-confirmed
     owner: project-maintainer
@@ -14,6 +14,7 @@ contracts:
       positive: A weekly used value of 31.6 produces 68% in the menu bar.
       negative: A five-hour rolling window is presented as weekly quota.
     guards:
+      - Tests/CodexWatchTests/AuditRegressionTests.swift
       - Tests/CodexWatchTests/MenuBarTextTests.swift
       - Tests/CodexWatchTests/UsageWindowClassifierTests.swift
       - Tests/CodexWatchTests/CodexUsageClientTests.swift
@@ -36,6 +37,8 @@ contracts:
       positive: Bounded app-server messages obtain official account state, ephemeral bounded GET requests obtain richer analytics when file credentials are available, and a CSV is written only after the user confirms a save destination.
       negative: A rollout JSONL file is parsed, an authenticated redirect is followed to another host, or analytics is cached automatically on disk.
     guards:
+      - Tests/CodexWatchTests/AppServer/ProcessAppServerLineTransportTests.swift
+      - Tests/CodexWatchTests/AuditRegressionTests.swift
       - Tests/CodexWatchTests/CodexAuthReaderTests.swift
       - Tests/CodexWatchTests/CodexUsageClientTests.swift
       - Tests/CodexWatchTests/UsageAnalyticsCSVExporterTests.swift
@@ -61,6 +64,7 @@ contracts:
     guards:
       - .github/workflows/ci.yml
       - .github/workflows/release.yml
+      - scripts/check_release.sh
       - scripts/release.sh
       - scripts/verify_app.sh
     supersedes: []
@@ -138,7 +142,7 @@ contracts:
   - id: CREDITS-BALANCE-009
     title: The status menu shows the server-reported ChatGPT credits remaining
     status: active
-    statement: When credits.has_credits is true and the existing usage response contains a numeric credits.balance value, the expanded status menu displays it in one Credits remaining row. Positive, zero, and negative server-reported balances are preserved. When credits.unlimited is true, the row displays Unlimited instead of a numeric balance. A missing entitlement, missing or malformed balance, or oversized value hides the row and is never replaced with an assumed zero. No message estimates or other credits metadata are displayed.
+    statement: When credits.has_credits is true and the existing usage response contains a numeric credits.balance value, the expanded status menu displays it in one Credits remaining row. Positive, zero, and negative server-reported balances are preserved. When credits.unlimited is true, the row displays Unlimited instead of a numeric balance. Numeric text must validate in full, not just as a numeric prefix. A missing entitlement, missing or malformed balance, or oversized value hides the row and is never replaced with an assumed zero. No message estimates or other credits metadata are displayed.
     rationale: The server can report a negative balance after concurrent usage depletes credits, while has_credits and unlimited determine whether a numeric balance has the intended meaning.
     source: user-confirmed-and-official-docs
     owner: project-maintainer
@@ -150,6 +154,7 @@ contracts:
       positive: A credits.balance of -1.25 with has_credits true displays Credits remaining and -1.25, while unlimited true displays Unlimited.
       negative: A missing entitlement displays zero, or approximate message counts are added to the menu.
     guards:
+      - Tests/CodexWatchTests/AuditRegressionTests.swift
       - Tests/CodexWatchTests/CodexUsageClientTests.swift
       - Tests/CodexWatchTests/MenuBarTextTests.swift
       - "manual: compare the Credits remaining row with the ChatGPT Usage Dashboard on a real Mac"
@@ -208,7 +213,7 @@ contracts:
   - id: REFRESH-COORDINATION-013
     title: Refresh work is coordinated, bounded, and user-selectable
     status: active
-    statement: A single coordinator owns automatic, manual, menu-open, wake, and app-server rate-limit update triggers. Repeated nonmanual triggers coalesce into active work; manual refresh replaces older work and only the newest generation may publish; scheduled delays start after completion; shutdown prevents publication. Fixed choices are Manual, 1, 2, 5, 15, and 30 minutes. Adaptive is the fresh-install default, ranges from 2 to 30 minutes based only on menu interaction, and uses 30 minutes during Low Power Mode or serious thermal pressure. Menu opening and rate-limit notifications are quota-only, while automatic analytics attempts remain at least 15 minutes apart.
+    statement: A single coordinator owns automatic, manual, menu-open, wake, and app-server rate-limit update triggers. Repeated nonmanual triggers coalesce into active work; manual refresh replaces older work and only the newest generation may publish either partial quota or final analytics; quota publishes without waiting for analytics; authentication failure marks retained analytics stale even on quota-only refreshes; scheduled delays start after completion; shutdown prevents publication. Fixed choices are Manual, 1, 2, 5, 15, and 30 minutes. Adaptive is the fresh-install default, ranges from 2 to 30 minutes based only on menu interaction, and uses 30 minutes during Low Power Mode or serious thermal pressure. Menu opening and rate-limit notifications are quota-only, while automatic analytics attempts remain at least 15 minutes apart.
     rationale: Generation ownership prevents cancellation churn and stale publication while explicit and adaptive choices control freshness without scanning processes, sessions, or user content.
     source: user-confirmed
     owner: project-maintainer
@@ -220,6 +225,7 @@ contracts:
       positive: Two automatic triggers share one fetch, while a later manual trigger replaces it and is the only generation allowed to update the menu and dashboard.
       negative: A repeating timer cancels a request every minute, a stale generation publishes after manual refresh, or adaptive cadence inspects running Codex processes.
     guards:
+      - Tests/CodexWatchTests/AuditRegressionTests.swift
       - Tests/CodexWatchTests/RefreshCoordinatorTests.swift
       - Tests/CodexWatchTests/MenuBarTextTests.swift
       - "manual: exercise every refresh-frequency choice and wake behavior on a real Mac"
@@ -254,7 +260,7 @@ contracts:
   - id: DATA-SOURCE-015
     title: Official account APIs are preferred without losing bounded compatibility
     status: active
-    statement: Codex Watch locates only an explicit or standard installed Codex executable, launches its experimental app-server command without a shell, completes the documented initialize handshake over one-mebibyte JSONL lines, times out unanswered requests after 20 seconds, and accepts only documented account response shapes while mapping unknown optional variants to unavailable. Official app-server quota is preferred. The bounded same-host HTTPS quota path is attempted only when app-server quota is unavailable. Rich compatibility profile data is preferred when available, with official account usage as a reduced lifetime fallback; the trailing 365-day Usage dataset remains compatibility-only. App-server account identity must be ChatGPT, and private thread usage, account email, invocation details from account usage, stderr, and raw responses are ignored. Each capability fails independently and missing sources remain unavailable rather than inferred.
+    statement: Codex Watch locates only an explicit or standard installed Codex executable, launches its experimental app-server command without a shell, completes the documented initialize handshake with experimentalApi disabled over one-mebibyte JSONL lines, times out unanswered requests after 20 seconds, and accepts only documented account response shapes while mapping unknown optional variants to unavailable. Failed connections are cleaned up and replaced after a 30-second retry floor with bounded notification resubscription, shared startup, and account revalidation before operations. Unsupported optional methods preserve a healthy quota connection. Official app-server quota is preferred. The bounded same-host HTTPS quota path is attempted only when app-server quota is unavailable. Rich compatibility profile data is preferred when available, with official account usage as a reduced lifetime fallback; the trailing 365-day Usage dataset remains compatibility-only. App-server account identity must be ChatGPT, and private thread usage, account email, invocation details from account usage, stderr, and raw responses are ignored. Each capability fails independently and missing sources remain unavailable rather than inferred.
     rationale: Managed Codex authentication supports file, keyring, and automatic credential stores, while a narrow fallback protects the app from an explicitly experimental command and preserves richer bounded analytics.
     source: user-confirmed-and-official-docs
     owner: project-maintainer
@@ -266,6 +272,8 @@ contracts:
       positive: A keyring-authenticated ChatGPT account receives official weekly quota without reading auth.json, while a file-authenticated account can still receive the richer bounded Usage projection.
       negative: A malformed app-server line is displayed verbatim, an API-key account is treated as ChatGPT, or thread-level usage is retained.
     guards:
+      - Tests/CodexWatchTests/AppServer/ProcessAppServerLineTransportTests.swift
+      - Tests/CodexWatchTests/AuditRegressionTests.swift
       - Tests/CodexWatchTests/AppServer/AppServerModelsTests.swift
       - Tests/CodexWatchTests/AppServer/CodexAppServerClientTests.swift
       - Tests/CodexWatchTests/AppServer/CodexExecutableLocatorTests.swift
@@ -279,7 +287,7 @@ contracts:
   - id: USER-CONTROLS-016
     title: Notifications and system controls remain explicit and privacy safe
     status: active
-    statement: Quota notifications default off, require macOS authorization, fire no more than once per descending 25, 10, 5, and exhausted threshold in a quota window, ignore stale data, and contain no quota percentage, account value, or sensitive error text. Launch at Login changes only after the user selects its menu item. Copy Diagnostics writes only app version, quota-source name, current or stale or unavailable capability states, and the two settings states. Reset-credit consumption is separately governed by RESET-CREDITS-006. No control adds telemetry, background analytics persistence, automatic redemption, or an update service.
+    statement: Quota notifications default off, require macOS authorization, fire no more than once per descending 25, 10, 5, and exhausted threshold in a quota window, retain threshold history through corrections within the same reset window, ignore stale data, and contain no quota percentage, account value, or sensitive error text. Launch at Login changes only after the user selects its menu item. Copy Diagnostics writes only app version, quota-source name, current or stale or unavailable capability states, and the two settings states. Reset-credit consumption is separately governed by RESET-CREDITS-006. No control adds telemetry, background analytics persistence, automatic redemption, or an update service.
     rationale: High-value alerts and controls can remain useful without placing private account state on the lock screen, clipboard, disk, or a new network destination.
     source: user-confirmed
     owner: project-maintainer

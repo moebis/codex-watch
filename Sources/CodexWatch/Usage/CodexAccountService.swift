@@ -32,34 +32,48 @@ protocol CodexAccountServing: Sendable {
 }
 
 actor CodexAccountService: CodexAccountServing {
-    private let client: any AppServerAccountServing
-    private var isStarted = false
-    private var isChatGPTAccount = false
+    typealias ClientFactory = @Sendable () throws -> any AppServerAccountServing
+
+    private struct Connection: Sendable {
+        let id: UUID
+        let client: any AppServerAccountServing
+        let startup: Task<Void, Error>
+    }
+
+    private let makeClient: ClientFactory
+    private let retryDelay: Duration
+    private var connection: Connection?
+    private var retryAfter: ContinuousClock.Instant?
+    private var stopped = false
 
     init(client: any AppServerAccountServing) {
-        self.client = client
+        makeClient = { client }
+        retryDelay = .seconds(30)
+    }
+
+    init(retryDelay: Duration = .seconds(30), makeClient: @escaping ClientFactory) {
+        self.makeClient = makeClient
+        self.retryDelay = retryDelay
     }
 
     static func makeDefault(clientVersion: String) -> CodexAccountService? {
-        guard let transport = try? ProcessAppServerLineTransport(
-            locator: CodexExecutableLocator()
-        ) else { return nil }
-        let client = CodexAppServerClient(
-            transport: transport,
-            clientInfo: AppServerClientInfo(
-                name: "codex-watch",
-                title: "Codex Watch",
-                version: clientVersion
+        CodexAccountService {
+            let transport = try ProcessAppServerLineTransport(locator: CodexExecutableLocator())
+            return CodexAppServerClient(
+                transport: transport,
+                clientInfo: AppServerClientInfo(
+                    name: "codex-watch", title: "Codex Watch", version: clientVersion
+                )
             )
-        )
-        return CodexAccountService(client: client)
+        }
     }
 
     func fetchQuota(fetchedAt: Date) async throws -> UsageSnapshot {
-        try await prepareChatGPTAccount()
         do {
-            let response = try await client.readRateLimits()
-            return AppServerUsageAdapter.snapshot(from: response, fetchedAt: fetchedAt)
+            return try await withAccount { client in
+                let response = try await client.readRateLimits()
+                return AppServerUsageAdapter.snapshot(from: response, fetchedAt: fetchedAt)
+            }
         } catch let error as CodexAccountServiceError {
             throw error
         } catch {
@@ -68,10 +82,11 @@ actor CodexAccountService: CodexAccountServing {
     }
 
     func fetchProfile(fetchedAt: Date) async throws -> CodexProfileStats {
-        try await prepareChatGPTAccount()
         do {
-            let response = try await client.readAccountUsage()
-            return AppServerUsageAdapter.profile(from: response, fetchedAt: fetchedAt)
+            return try await withAccount { client in
+                let response = try await client.readAccountUsage()
+                return AppServerUsageAdapter.profile(from: response, fetchedAt: fetchedAt)
+            }
         } catch let error as CodexAccountServiceError {
             throw error
         } catch {
@@ -79,50 +94,81 @@ actor CodexAccountService: CodexAccountServing {
         }
     }
 
-    func consumeReset(
-        idempotencyKey: String,
-        creditID: String?
-    ) async throws -> AppServerResetOutcome {
-        try await prepareChatGPTAccount()
-        do {
-            return try await client.consumeRateLimitReset(
-                idempotencyKey: idempotencyKey,
-                creditID: creditID
-            )
-        } catch let error as AppServerError {
-            throw error
-        } catch {
-            throw CodexAccountServiceError.unavailable
+    func consumeReset(idempotencyKey: String, creditID: String?) async throws -> AppServerResetOutcome {
+        // Never retry a mutation here. The confirmed caller owns its pending idempotency key.
+        try await withAccount { client in
+            try await client.consumeRateLimitReset(idempotencyKey: idempotencyKey, creditID: creditID)
         }
     }
 
     func rateLimitUpdates() async throws -> AsyncStream<AppServerRateLimitSnapshot> {
-        try await prepareChatGPTAccount()
-        return await client.rateLimitUpdates()
+        try await withAccount { client in await client.rateLimitUpdates() }
     }
 
     func stop() async {
-        isStarted = false
-        isChatGPTAccount = false
-        await client.stop()
+        stopped = true
+        let previous = connection
+        connection = nil
+        previous?.startup.cancel()
+        await previous?.client.stop()
     }
 
-    private func prepareChatGPTAccount() async throws {
-        if isStarted, isChatGPTAccount { return }
-        do {
-            if !isStarted {
-                try await client.start()
-                isStarted = true
+    private func withAccount<Value: Sendable>(
+        _ operation: @Sendable (any AppServerAccountServing) async throws -> Value
+    ) async throws -> Value {
+        try Task.checkCancellation()
+        guard !stopped else { throw CodexAccountServiceError.unavailable }
+        if connection == nil {
+            if let retryAfter, ContinuousClock.now < retryAfter {
+                throw CodexAccountServiceError.unavailable
             }
-            let response = try await client.readAccount()
-            guard case .chatGPT = response.account else {
+            do {
+                let client = try makeClient()
+                connection = Connection(
+                    id: UUID(), client: client, startup: Task { try await client.start() }
+                )
+            } catch {
+                retryAfter = .now.advanced(by: retryDelay)
+                throw CodexAccountServiceError.unavailable
+            }
+        }
+        guard let current = connection else { throw CodexAccountServiceError.unavailable }
+        var startupSucceeded = false
+        do {
+            try await current.startup.value
+            startupSucceeded = true
+            try Task.checkCancellation()
+            guard !stopped, connection?.id == current.id else {
+                throw CodexAccountServiceError.unavailable
+            }
+            // Account reads are local and do not refresh tokens. Revalidate rather than
+            // keeping a ChatGPT authorization decision across login/logout changes.
+            let account = try await current.client.readAccount()
+            guard case .chatGPT = account.account else {
                 throw CodexAccountServiceError.signInRequired
             }
-            isChatGPTAccount = true
-        } catch let error as CodexAccountServiceError {
-            throw error
+            return try await operation(current.client)
         } catch {
-            throw CodexAccountServiceError.unavailable
+            if (!startupSucceeded || Self.requiresReconnect(error)), connection?.id == current.id {
+                connection = nil
+                retryAfter = .now.advanced(by: retryDelay)
+                current.startup.cancel()
+                await current.client.stop()
+            }
+            throw error
         }
+    }
+
+    private static func requiresReconnect(_ error: Error) -> Bool {
+        if error is CancellationError || error is CodexAccountServiceError { return false }
+        if let error = error as? AppServerError {
+            switch error {
+            case .remoteError, .invalidIdempotencyKey, .invalidResponse:
+                // Unsupported optional methods must not break an otherwise healthy connection.
+                return false
+            default: return true
+            }
+        }
+        return true
     }
 }
