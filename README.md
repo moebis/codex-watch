@@ -1,11 +1,11 @@
 # Codex Watch
 
-Codex Watch is a native macOS menu bar app for monitoring ChatGPT Codex quota, token usage, and activity. Version 1.3.1 prefers Codex's managed-auth app-server account APIs, preserves a bounded compatibility path for richer analytics, and adds explicit quota alerts and account controls while keeping the menu-bar percentage focused on the base weekly quota.
+Codex Watch is a native macOS menu bar app for monitoring ChatGPT Codex quota, token usage, and activity. Version 1.3.2 prefers Codex's managed-auth app-server account APIs, preserves a bounded compatibility path for richer analytics, and adds explicit quota alerts and account controls while keeping the menu-bar percentage focused on the base weekly quota.
 
 ## What it shows
 
 - The rounded percentage remaining in the base weekly Codex quota, always visible in the menu bar.
-- Every valid base and code-review quota window returned by ChatGPT, including remaining percentage, reset countdown, and progress. Codex Spark limits remain decoded but are intentionally hidden from the compact menu.
+- Every valid base and code-review quota window returned by ChatGPT, including remaining percentage, reset countdown, and progress. Codex Spark limits are hidden by default. Enable `Show Codex Spark Stats` beside the refresh and notification preferences in the menu to display them; the choice is remembered.
 - Deterministic quota pace (`On pace`, `in reserve`, or `in deficit`) once at least 3% of a server-provided window has elapsed. Pace is a linear snapshot, not a probability or entitlement estimate.
 - The recognized ChatGPT plan, credits balance or `Unlimited`, available reset-credit count, and the earliest supported reset-credit expiry when present.
 - A persistent `30 Days` / `Lifetime` selector in the compact menu. The 30-day summary shows total, uncached-input, cached-input, and output tokens plus turns, chats, token coverage, and server data-through date; Lifetime shows exact first-party headline totals, peak daily tokens, longest chat, streaks, and data-through date.

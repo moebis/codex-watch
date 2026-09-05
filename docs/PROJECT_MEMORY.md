@@ -1,9 +1,9 @@
 ---
 status: current
 owner: project-maintainer
-last_verified_commit: 018225f
-current_release: 1.3.1
-current_build: 21
+last_verified_commit: a628a8c
+current_release: 1.3.2
+current_build: 22
 ---
 
 # Codex Watch project memory
@@ -16,9 +16,9 @@ This file is the compact handoff for future work. Read `ARCHITECTURE.md`, the ac
 - Upstream attribution: `https://github.com/smallyunet/codex-notch`
 - Local checkout: `/Users/moebis/Documents/Codex/Codex Watch`
 - Integration policy: work directly on `main`; do not create branches unless the user explicitly reverses that policy.
-- Version 1.3.1 build 21 is implemented in commit `018225f`. On 2026-09-05 it passed contracts, release-script regressions, 197 tests, complete strict-concurrency diagnostics, AddressSanitizer, ThreadSanitizer, and signed universal `arm64` and `x86_64` bundle verification. It was installed at `/Applications/Codex Watch.app`, relaunched, and confirmed running with its app-server child. The installed executable matched the verified build. Recheck live machine state before relying on installation details.
+- Version 1.3.2 build 22 is implemented in commit `a628a8c`. On 2026-09-05 it passed contracts, 199 tests, and signed universal `arm64` and `x86_64` bundle verification. It was installed at `/Applications/Codex Watch.app`, relaunched, and confirmed running with its app-server child. The installed executable matched the verified build. Spark rows now default to hidden, including the versioned GPT names; the menu visibility toggle persists both choices. Recheck live machine state before relying on installation details. The underlying 1.3.1 audit fixes previously passed release-script regressions, strict concurrency, AddressSanitizer, and ThreadSanitizer; those broader checks were not repeated for this settings-only change.
 - Stable protocol schema inspection confirmed all four required account methods, including reset consumption, without experimental opt-in. Live reads through the production Swift account service validated base-weekly quota and Lifetime data; no reset was consumed.
-- The previous installed 1.3.0 build 20 bundle was preserved recoverably. No version tag or GitHub Release was created; only local installation and main publication were authorized. The Computer Use bridge timed out, so real-menu notification, Launch at Login, reset confirmation, dashboard geometry, CSV save, and first-launch Gatekeeper acceptance remain owner-operated.
+- The previous installed 1.3.1 build 21 bundle was preserved recoverably. No version tag or GitHub Release was created; only local installation and main publication were authorized. The Computer Use bridge timed out, so real-menu Spark-toggle appearance, notification, Launch at Login, reset confirmation, dashboard geometry, CSV save, and first-launch Gatekeeper acceptance remain owner-operated.
 
 ## Durable product decisions
 
@@ -28,7 +28,7 @@ This file is the compact handoff for future work. Read `ARCHITECTURE.md`, the ac
 4. **Narrow privacy boundary.** Read only the existing bounded Codex auth file, contact only the original ChatGPT HTTPS host, retain authenticated data in memory, and export only a user-selected validated Usage projection.
 5. **Independent capability failures.** Quota, Usage, Lifetime, and reset-credit detail may fail independently. Preserve last-good in-memory capability data only with explicit stale presentation.
 6. **Native adaptive status presentation.** Use a template SF Symbol and native text color. Custom colored menu-bar artwork and forced foreground colors failed across macOS appearances.
-7. **Spark is presentation-only filtering.** Decode Spark windows, but hide `codex-spark` and all `codex-spark-*` identifiers from the compact menu so duplicate suffixes do not leak back into the UI.
+7. **Spark visibility is an explicit preference.** Decode Spark windows and hide them by default. `Show Codex Spark Stats` persists the chosen visibility and rebuilds the menu without fetching. Match adjacent Codex/Spark words in IDs or titles, including versioned GPT names and duplicate suffixes, without changing the base quota.
 8. **No automatic updater.** Local builds and tag-driven GitHub releases are deliberate. Do not reintroduce update checks, downloads, or installs without an explicit security and product decision.
 9. **Official account source with compatibility fallback.** Prefer the local Codex app-server for managed-auth quota, account usage, update notifications, and confirmed reset credits. Retain bounded same-host HTTPS only as the experimental-command fallback and richer aggregate analytics source.
 10. **Explicit user controls only.** Notifications default off and contain no private values. Reset credits require confirmation and idempotent retry. Launch at Login and Copy Diagnostics are direct user actions; diagnostics contain operational state only.
@@ -43,7 +43,7 @@ This file is the compact handoff for future work. Read `ARCHITECTURE.md`, the ac
 - The refresh coordinator's generation model is simpler and safer than independent repeating timers: automatic work coalesces, manual work replaces, and stale generations cannot publish.
 - Leak-tool output from Apple frameworks is not evidence of a project leak. Prefer project-owned stack evidence, AddressSanitizer, ThreadSanitizer, stable runtime sampling, and bounded lifecycle review; never claim absolute leak freedom.
 
-## 1.3.1 current-release safeguards
+## Current-release safeguards
 
 - The Codex app-server uses JSONL over stdio and the required initialize handshake with experimental APIs disabled. Bound each line while reading, discard child stderr, validate request IDs and documented response variants, and ignore private thread-level account usage.
 - The app-server command is currently experimental. Keep quota fallback independent from compatibility-only Usage analytics so keyring-authenticated users retain official account surfaces and file-authenticated users retain richer views.

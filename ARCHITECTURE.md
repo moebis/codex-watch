@@ -1,7 +1,7 @@
 ---
 status: active
 owner: project-maintainer
-last_verified_commit: 018225f
+last_verified_commit: a628a8c
 ---
 
 # Codex Watch architecture
@@ -89,7 +89,7 @@ No response, token, account identifier, or analytics dataset is logged or cached
 
 - The app-server adapter prefers the explicit `codex` map entry and accepts only a base or unidentified legacy bucket. The menu-bar number is always the rounded remaining base-weekly percentage. It never switches to a rolling, Spark, or model-specific limit.
 - The status item uses the template `chart.pie.fill` SF Symbol and native foreground rendering so both icon and percentage adapt to light, dark, and selected materials.
-- Spark capabilities remain decoded but any identifier equal to `codex-spark` or beginning with `codex-spark-` is omitted from the compact menu, including server-generated duplicate suffixes.
+- Spark capabilities remain decoded and hidden by default. The persistent `Show Codex Spark Stats` menu preference reveals them without fetching again. Presentation recognizes adjacent Codex/Spark words in identifiers or titles, including versioned GPT names and duplicate suffixes; base quota semantics remain unchanged.
 - Usage and Lifetime are distinct sources. The bounded 365-day dataset powers 7/30/90/365 projections; exact lifetime totals come from the profile route.
 - Activity-only days, observed zero-token days, and missing days remain distinct. Model rows describe activity; client rows describe tokens.
 - The heatmap uses seven weekday rows and as many week columns as the selected range needs. Model and client tables scroll horizontally instead of clipping narrow windows, and the dashboard refresh button invokes the same manual generation as the menu.
@@ -102,6 +102,7 @@ UserDefaults stores only:
 - compact-menu `30 Days` or `Lifetime` selection;
 - dashboard range and section selection;
 - quota-notification opt-in;
+- Codex Spark stats visibility (off by default);
 - the analytics window frame through AppKit autosave.
 
 Quota, credentials, analytics, profile statistics, refresh timestamps, and errors remain process-local.

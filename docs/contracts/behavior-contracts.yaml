@@ -255,7 +255,7 @@ contracts:
       - "manual: compare menu and dashboard Lifetime values with the official Codex profile and inspect the pie icon and percentage in light, dark, and selected states"
     supersedes: []
     superseded_by: null
-    last_verified_commit: 018225f
+    last_verified_commit: a628a8c
 
   - id: DATA-SOURCE-015
     title: Official account APIs are preferred without losing bounded compatibility
@@ -304,4 +304,4 @@ contracts:
       - "manual: authorize notifications, toggle Launch at Login, and inspect copied diagnostics on a real Mac"
     supersedes: []
     superseded_by: null
-    last_verified_commit: 018225f
+    last_verified_commit: a628a8c
