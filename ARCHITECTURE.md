@@ -38,7 +38,7 @@ Both paths
     -> optional user-selected atomic CSV export
 ```
 
-No response, token, account identifier, or analytics dataset is logged or cached. Missing, malformed, negative, non-finite, duplicate, out-of-range, or overflowing fields fail closed instead of being estimated.
+Authenticated data is neither logged nor cached. Validation rejects malformed, non-finite, overflowing, or unsupported values without estimating missing data. Signed credit balances are valid; nonnegative usage metrics have separate bounds.
 
 ## Component ownership
 
@@ -65,7 +65,7 @@ No response, token, account identifier, or analytics dataset is logged or cached
 - `SecureUsageSession` is ephemeral, uncached, and cookieless. Authenticated requests require HTTPS and the original ChatGPT host and effective port; cross-host redirects are rejected.
 - `CodexUsageClient` consumes response bytes incrementally and stops after one mebibyte. The reset-credit detail request is optional and has a shorter timeout.
 - The only authenticated destinations are the quota, reset-credit, bounded daily analytics, and profile paths on the original ChatGPT origin.
-- Profile identity and editing fields are ignored. Lifetime values come only from validated server profile statistics, never from local sessions or partial analytics history.
+- Profile identity and editing fields are ignored. Lifetime prefers validated same-host profile statistics and falls back to the reduced official account-usage summary, never local sessions or a partial-year sum.
 - CSV is written atomically only after `NSSavePanel` returns a user-selected destination. Lifetime data is not exported.
 - Quota notifications are off by default and contain no quota percentage or account value. macOS owns notification authorization and delivery persistence. Launch at Login is changed only through the user-selected menu toggle.
 - Reset-credit consumption requires a confirmation, uses the documented idempotency key, retains an uncertain request only in memory for safe retry, and always refetches after an exact server outcome.
@@ -107,21 +107,19 @@ UserDefaults stores only:
 
 Quota, credentials, analytics, profile statistics, refresh timestamps, and errors remain process-local.
 
-## Build and release
+## Build, verification, and retention
 
-- `./scripts/check_contracts.sh` validates the active behavior-contract schema.
-- `swift test` runs deterministic unit and integration tests.
-- `./scripts/verify.sh /private/tmp/codex-watch-verify` validates contracts, tests, release compilation, Info.plist, ICNS representations, signature, and optional architectures outside synced storage.
-- `./scripts/check_release.sh` gates packaging on contracts, release-script regressions, and complete strict-concurrency compilation.
-- Build scripts use `CODEX_WATCH_SCRATCH_PATH`, defaulting to temporary storage, for Swift build intermediates.
-- `./scripts/release.sh /private/tmp/codex-watch-release` creates the verified ZIP and SHA-256 file. `ARCHITECTURES="arm64 x86_64"` produces the universal artifact.
-- CI verifies executable changes pushed to `main`; narrowly scoped non-executable authority changes are excluded. A `vMAJOR.MINOR.PATCH` tag must match `CFBundleShortVersionString` before the release workflow publishes assets.
-- Local bundles are ad-hoc signed with hardened runtime. The repository has no Developer ID or notarization credentials.
-- Build and sign outside File Provider or other synced repository paths. Auto-attached Finder metadata makes strict signature verification fail even when the compiled bundle is otherwise valid.
+Use `docs/agent-harness.md` to select one proportional verification path. `verify.sh` already checks contracts, runs tests, builds, and verifies the bundle. `release.sh` adds release-script/strict-concurrency prerequisites and exact extracted-archive verification. Build scripts use `CODEX_WATCH_SCRATCH_PATH` in temporary storage by default; direct Swift commands must also select nonsynced scratch storage.
+
+Bundles are ad-hoc signed with hardened runtime; Developer ID and notarization are not configured. Synced folders can reattach Finder metadata and break strict signatures. Verify the exact built, installed, or extracted artifact without weakening signature checks.
+
+The runtime is entirely local, with outbound ChatGPT requests. There is no project-owned production service, database, or Docker deployment configured. Keep the installed app and one latest verified rollback bundle; user preferences and CSV exports are separate from app-bundle recovery. Remove obsolete project-owned build/sanitizer trees and temporary artifacts after they are no longer in use. Do not prune shared developer caches, other projects, or system backups.
+
+Inspect `.github/workflows/` before every push. Existing main/PR and version-tag triggers can start hosted Actions; routine directly verified pushes must use a supported skip marker. Tags require separate release authorization and must match `CFBundleShortVersionString`. Do not treat an automatic trigger as permission to spend hosted quota.
 
 ## Explicit constraints and deferred decisions
 
-- The app is intentionally unsandboxed because it directly reads the existing Codex credential file. Enabling App Sandbox requires a separate authentication or security-scoped-access design; do not toggle it as a packaging-only change.
+- The app is unsandboxed to support the known Codex child process and optional credential-file compatibility path. App Sandbox requires a deliberate process/authentication access design, not a packaging-only toggle.
 - ChatGPT endpoints are internal and may change. Preserve independent failures, stale labeling, bounded reads, and truthful unavailable states when adapting schemas.
 - New hosts, private-data persistence, local-history indexing, multi-account support, providers, updater behavior, or additional state-changing API calls require explicit contracts and an architecture decision.
 - Do not restore completed implementation plans. Distill durable behavior here, in `docs/PROJECT_MEMORY.md`, contracts, or active decisions; use Git history for release archaeology.

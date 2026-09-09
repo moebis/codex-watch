@@ -8,28 +8,12 @@ created_at: 2026-07-31
 last_verified_commit: a3db739
 ---
 
-# Read reset-credit expiry from the same ChatGPT host
+# Reset-credit expiry and confirmed redemption
 
-## Context
+Quota resets and banked reset credits have independent lifetimes. Compatibility quota exposes credit counts; the separate same-host detail route supplies availability, plan support, grant, and expiry metadata.
 
-The existing usage response exposes only reset-credit counts. It does not include the per-credit expiry needed to warn when a banked reset will disappear. ChatGPT exposes those details from a separate read-only path on the same authenticated host.
+Use the existing ephemeral HTTPS session and original host/port. Fetch details only for a positive count, with a five-second timeout. Display the earliest available credit expiry supported by the current plan. Show lifetime progress only when both exact timestamps are valid; missing details preserve quota/count without inventing expiry or duration.
 
-## Decision
+Redemption is a separate confirmed app-server action under `RESET-CREDITS-006`. Keep one idempotency key across an uncertain retry, retain the pending request only in memory, and refetch quota after an exact outcome. Refresh must never spend a credit.
 
-- Request reset-credit details only when the usage response reports a positive available count.
-- Use the existing ephemeral authenticated session and require the detail URL to use HTTPS with the same host and port as the usage URL.
-- Decode only availability, plan support, grant, and expiry metadata needed for display.
-- Show the earliest expiry among available credits supported by the current plan in the user's local time zone, and visualize remaining lifetime as `(expires_at - now) / (expires_at - granted_at)` when both timestamps are valid.
-- Treat the detail request as best-effort with a five-second request timeout. A failure preserves weekly quota and reset-credit count without inventing an expiry.
-- When the app-server supplies available credit inventory, offer a separate confirmed redemption action. Use one UUID idempotency key across an uncertain retry, keep that pending request only in process memory, and refresh quota after an exact server outcome.
-
-## Rejected alternatives
-
-- **Reuse the weekly quota reset:** banked reset credits have independent expiry semantics.
-- **Assume a fixed lifetime from grant date:** promotions can use different expiry policies.
-- **Persist the detail response:** the menu can derive its display in memory and does not need private account data on disk.
-- **Redeem automatically:** spending a server-managed credit requires explicit user intent and a visible result.
-
-## Consequences
-
-Each compatibility refresh with a positive reset-credit count may make one additional read-only request to the existing ChatGPT host. The detail path is not a public API, so the app must continue to degrade safely if its response or availability changes. Missing or invalid grant metadata leaves the expiry text visible but hides its progress bar rather than assuming a lifetime. Redemption is available only through the documented app-server account method and never happens during refresh.
+Do not reuse the weekly reset, assume a fixed credit lifetime, cache the private response, or redeem automatically. These alternatives either conflate different entitlements or bypass user intent. The detail route is internal, so optional failure must remain harmless.

@@ -1,53 +1,31 @@
 # Codex Watch maintenance guide
 
-## Product boundary
+## Read only the relevant authority
 
-Codex Watch is a standalone native macOS menu bar app with one user-opened native analytics window. It displays the remaining weekly ChatGPT Codex quota as a native adaptive pie-chart icon plus percentage, hides Codex Spark limits from the compact menu, prefers managed-auth Codex app-server account data, retains bounded same-host HTTPS for compatibility and richer analytics, and projects one bounded 365-day analytics response into 7/30/90/365-day views. Notifications, Launch at Login, diagnostics, and reset-credit use remain explicit user controls. It does not render a notch overlay or inspect Codex session or rollout logs.
+Start with `docs/PROJECT_MEMORY.md` and `docs/agent-harness.md`. Before changing behavior, authentication, privacy, packaging, or release automation, also read `ARCHITECTURE.md`, affected records in `docs/contracts/behavior-contracts.yaml`, and relevant active decisions from `docs/decisions/README.md`. Do not load unrelated decisions or historical release narration for a narrow task.
 
-## Required change harness
+For implementation, state the change, preserved behavior, scope exclusions, risk, and verification plan before editing. Documentation-only work needs focused authority, link, and whitespace checks.
 
-Before changing visible behavior, quota semantics, authentication, privacy, packaging, or release automation, read:
+## Product and privacy
 
-1. `ARCHITECTURE.md`
-2. `docs/PROJECT_MEMORY.md`
-3. `docs/agent-harness.md`
-4. `docs/contracts/behavior-contracts.yaml`
-5. Relevant active records in `docs/decisions/`
+- Native macOS menu bar app with one user-opened analytics window. The adaptive pie icon and percentage always represent remaining base-weekly Codex quota. Spark rows default hidden and have an explicit persistent display toggle.
+- Prefer managed-auth Codex app-server account data; keep bounded same-host HTTPS compatibility and richer analytics. One bounded 365-day response powers 7/30/90/365 views; exact Lifetime data is a separate source.
+- Never print or commit auth files, credentials, Authorization headers, complete usage responses, prompts, or conversation metadata. Keep authenticated data in memory; only user-selected Usage CSV export may persist analytics.
+- Keep HTTPS ephemeral and on the original host. Bound app-server JSONL while reading; discard child stderr, ignore private account/thread fields, and launch only a known executable without a shell.
+- Notifications, Launch at Login, diagnostics, export, and reset redemption require explicit user actions. Reset spending requires confirmation and idempotent retries. Keep notification copy and diagnostics free of private values, paths, and raw errors.
+- No session scanning, notch overlay, telemetry, updater, or third-party destinations without an explicit contract change.
 
-State what changes, what remains unchanged, what is out of scope, the risk level, and the verification plan before editing.
+## Verification and artifacts
 
-## Privacy boundary
+Use the lowest sufficient path in `docs/agent-harness.md`; its aggregate gates already include their prerequisites. Do not run the same tests twice or rebuild for documentation changes. Authentication, parsing, concurrency, lifecycle, or runtime memory-safety changes additionally require strict-concurrency compilation and the relevant sanitizer suite; editing project-memory prose does not.
 
-- Never commit or print `CODEX_HOME/auth.json`, access tokens, Authorization headers, complete usage responses, prompts, or conversation metadata.
-- Do not add session-log scanning, telemetry, automatic updates, or third-party network destinations without an explicit contract change and review.
-- Keep authenticated analytics and profile statistics in process memory. The only analytics persistence allowed by the active contracts is a bounded Usage CSV written after the user chooses a destination.
-- Keep the production network session ephemeral and restricted to HTTPS on the original host.
-- Bound app-server JSONL lines while consuming them, discard child stderr, ignore thread-level account usage and identity fields, and launch only a known Codex executable without a shell.
-- Keep notification copy and diagnostics free of quota values, account data, credentials, paths, and raw errors. Never spend a reset credit without confirmation and idempotent retry semantics.
+Build and sign outside synced storage. Use `./scripts/verify.sh /private/tmp/codex-watch-verify` for an installable bundle, and `./scripts/release.sh /private/tmp/codex-watch-release` only for a distributable archive. Native menu/dashboard layout, notification delivery, login registration, CSV save, and Gatekeeper behavior require real-Mac confirmation when affected.
 
-## Validation
+Keep the installed app and at most one verified latest rollback bundle. After successful installation, remove obsolete project-owned builds, sanitizer scratch trees, archives, and temporary outputs when cleanup is authorized. Preserve preferences, user exports, source history, and shared caches. There is no project production server or Docker deployment; never prune unrelated infrastructure.
 
-Choose the lowest sufficient verification level from `docs/agent-harness.md`; do not run every entry point for every change. Narrow documentation and copy changes need focused whitespace and authority checks. Behavior changes need their relevant regression tests, widened according to risk. Use `./scripts/verify.sh /private/tmp/codex-watch-verify` for the full app-bundle gate.
+## Git and documentation
 
-Run `./scripts/release.sh /private/tmp/codex-watch-release` only when producing a distributable local artifact. A pushed version tag triggers the GitHub release workflow.
-
-Build and sign outside File Provider or synced repository paths; injected Finder metadata invalidates strict signature verification.
-
-For authentication, parsing, concurrency, task-lifecycle, or memory changes, also run complete strict-concurrency compilation with warnings as errors and the relevant AddressSanitizer or ThreadSanitizer suite.
-
-Menu bar layout, dashboard rendering, notifications, Launch at Login, CSV save behavior, and first-launch Gatekeeper behavior require confirmation on a real Mac.
-
-## Git and releases
-
-- Preserve unrelated worktree changes.
-- Work directly on `main`; do not create branches unless the user explicitly reverses this repository policy.
-- Keep meaningful changes in intentional commits.
-- Push or publish only when explicitly requested.
-- Do not create or push a tag unless a GitHub Release is separately requested.
-- Version tags must match `CFBundleShortVersionString` and use the form `vMAJOR.MINOR.PATCH`.
-
-## Documentation hygiene
-
-- Keep current authority compact. Durable structure belongs in `ARCHITECTURE.md`; durable handoff state belongs in `docs/PROJECT_MEMORY.md`; normative behavior belongs in active contracts and decisions.
-- Do not add completed implementation plans or duplicate historical specifications. Git history is the release archive.
-- Update version-specific verification guards whenever `Resources/Info.plist` changes.
+- Work in the primary checkout on `main`, preserve unrelated changes, and push only when requested. No branch/worktree or version tag without explicit authorization; GitHub Releases require a separate request.
+- Inspect destination workflow triggers before every push. When direct verification suffices, use a supported skip marker such as `[skip ci]`; do not rely on path filters. Do not alter recurring workflows or restore automatic triggers without authorization.
+- Keep structure in `ARCHITECTURE.md`, current handoff in `docs/PROJECT_MEMORY.md`, and normative behavior/rationale in active contracts/decisions. Git history is the archive; do not retain completed plans or duplicate release narratives.
+- When `Resources/Info.plist` changes, update version/build verification guards. Tags must match `CFBundleShortVersionString` as `vMAJOR.MINOR.PATCH`.

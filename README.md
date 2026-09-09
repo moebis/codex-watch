@@ -73,7 +73,7 @@ EXPECTED_ARCHITECTURES="arm64 x86_64" \
 ./scripts/verify.sh /private/tmp/codex-watch-build
 ```
 
-Quit Codex Watch, move any existing application aside as a recoverable rollback copy, then install and verify the new bundle:
+Quit Codex Watch and preserve the existing app as the latest rollback copy in `~/Library/Application Support/Codex Watch/Backups`, then install and verify the new bundle. Retain only one verified rollback after installation succeeds:
 
 ```sh
 ditto "/private/tmp/codex-watch-build/Codex Watch.app" "/Applications/Codex Watch.app"
@@ -85,11 +85,13 @@ The local release is ad-hoc signed because this repository does not contain an A
 
 ## Build, test, and release
 
+Choose the relevant path in [the change harness](docs/agent-harness.md). For an installable app, this single command includes contracts, tests, compilation, and bundle verification:
+
 ```sh
-./scripts/check_contracts.sh
-swift test
 ./scripts/verify.sh /private/tmp/codex-watch-verify
 ```
+
+Documentation-only edits need link, authority, and whitespace checks; focused behavior changes need the relevant tests. Do not run the same prerequisites again before an aggregate gate.
 
 Create a local universal release archive:
 
@@ -102,7 +104,9 @@ Swift build intermediates use temporary storage by default; `CODEX_WATCH_SCRATCH
 
 Keep signing output outside File Provider or other synced folders. Those services can attach Finder metadata to an app bundle after creation, which makes strict code-signature verification fail even when the source and build are valid.
 
-A `vMAJOR.MINOR.PATCH` tag matching `CFBundleShortVersionString` triggers the GitHub release workflow. CI tests, builds, verifies, archives, checksums, and publishes the app; it rejects a mismatched tag.
+Inspect workflow triggers before pushing. Use `[skip ci]` for routine pushes verified directly, including documentation updates. A separately authorized `vMAJOR.MINOR.PATCH` tag matching `CFBundleShortVersionString` triggers hosted release packaging and publication; it rejects a mismatched tag. An existing trigger does not authorize hosted execution when a direct path suffices.
+
+Remove obsolete project build/temp outputs after use and keep one latest verified rollback app. Codex Watch has no configured production server or Docker deployment. Keep preferences, user-selected exports, shared caches, and unrelated backups separate from app-build cleanup.
 
 ## Architecture and maintenance
 

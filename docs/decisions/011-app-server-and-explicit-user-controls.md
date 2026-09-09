@@ -8,31 +8,14 @@ created_at: 2026-08-30
 last_verified_commit: 018225f
 ---
 
-# Prefer managed Codex account APIs and keep user controls explicit
+# Managed account APIs and explicit user controls
 
-## Context
+File-only authentication excludes keyring/automatic credential stores. Prefer managed ChatGPT account methods through a known local Codex executable and retain bounded same-host HTTPS for quota fallback and richer analytics. The command/protocol dependency may change; optional capabilities must fail independently.
 
-Codex Watch previously depended on direct access to `auth.json`. Current Codex documentation exposes managed account, rate-limit, account-usage, reset-credit, and update-notification methods through the local app-server. That supports Codex credential stores without copying secrets into this app. The app-server command is currently experimental, and the existing same-host HTTPS routes still provide richer bounded analytics. The product also needs useful alerts and system controls without expanding private-data retention.
+`DATA-SOURCE-015` owns the bounded JSONL handshake with experimental APIs disabled, request timeouts, child cleanup, account revalidation, and retry floor. Real pipes need POSIX reads that consume short replies while stdout remains open; in-memory transport tests alone missed the initialization stall. Ignore private account identity and thread-usage fields and discard stderr.
 
-## Decision
+Official quota is preferred. Lifetime prefers the richer compatibility profile, then reduced official account usage; trailing-365-day Usage remains compatibility-only. Publish quota before slower analytics through the generation guard. Account notifications request coalesced quota-only refreshes; authentication loss marks retained analytics stale.
 
-- Launch only a known installed Codex executable directly, without a shell, using `app-server` and the documented initialize handshake over JSONL stdio with `experimentalApi` disabled. Bound each input and output line to one mebibyte, time out unanswered requests after 20 seconds, discard child stderr, validate documented response shapes, and ignore account email and thread-level usage.
-- Require a ChatGPT account. Prefer app-server quota and use bounded same-host HTTPS quota only when the official source is unavailable. Prefer the richer compatibility profile when available, then fall back to the reduced official account-usage summary. Keep the trailing 365-day Usage dataset compatibility-only.
-- Treat app-server rate-limit updates as coalesced quota-only refresh triggers under the existing generation coordinator. Failed connections are cleaned up and replaced after a 30-second retry floor; observation resubscribes with the same bounded cadence. Revalidate the account before operations and never retry a reset mutation automatically.
-- Publish quota independently of slow analytics through the coordinator generation guard. Authentication loss marks retained analytics stale even when those capabilities were not attempted.
-- Permit reset-credit consumption only through the documented app-server method after an explicit confirmation. Generate one UUID idempotency key, preserve an uncertain request only in memory for retry, clear it only after an exact outcome, and refetch after exact outcomes.
-- Keep quota notifications off by default. Require macOS authorization, suppress stale data and repeat alerts, and use generic copy without percentages or account values.
-- Expose Launch at Login through `SMAppService.mainApp`. Copy Diagnostics may include only version, quota-source name, capability freshness, and settings state.
-- Preserve the same-host HTTPS path while app-server remains experimental. Do not add WebSocket transport, another host, telemetry, an updater, or private-data persistence.
+`USER-CONTROLS-016` keeps quota alerts opt-in, generic, and free of repeated/stale notifications; Launch at Login uses `SMAppService.mainApp`, and diagnostics contain only operational state. `RESET-CREDITS-006` requires confirmation and idempotent handling of uncertain spending.
 
-## Rejected alternatives
-
-- **Remove compatibility HTTPS immediately:** this would discard richer bounded Usage analytics and make an experimental command a single point of failure.
-- **Continue file-only authentication:** users configured for keyring or automatic credential storage would be excluded and Codex Watch would keep duplicating credential handling.
-- **Include quota percentages in notifications:** lock-screen content can expose private account state outside the app.
-- **Automatically spend reset credits:** a state-changing account action requires explicit intent and a visible result.
-- **Copy raw errors or paths for diagnostics:** operational support does not require credentials, account identifiers, filesystem layout, or usage values.
-
-## Consequences
-
-The app now owns a local child-process lifecycle and an experimental protocol dependency, so malformed input, termination, and missing executables must degrade to compatibility or unavailable state without leaking diagnostics. Keyring-authenticated users can receive official quota and reduced lifetime summaries without direct credential access. File-authenticated users retain richer bounded analytics. Notification authorization and launch registration are macOS-managed state, while all authenticated values and uncertain reset requests remain process-local.
+Rejected directions: removing compatibility prematurely, remaining file-auth-only, exposing quota values on the lock screen, automatic redemption, raw-error diagnostics, WebSockets, telemetry, or an updater. These either discard supported capabilities or widen privacy/lifecycle scope without a product need. Authenticated data and uncertain reset requests remain process-local; macOS owns notification authorization and login registration.

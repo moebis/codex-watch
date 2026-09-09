@@ -8,73 +8,23 @@ current_build: 22
 
 # Codex Watch project memory
 
-This file is the compact handoff for future work. Read `ARCHITECTURE.md`, the active contracts, and the active decisions for normative detail.
+## Current state and routing
 
-## Current state
+- Native Mac app; repository `https://github.com/moebis/codex-watch`, primary checkout on `main`. No project production server, database, Docker deployment, or automatic updater. See README for install commands and attribution.
+- Version/build authority is `Resources/Info.plist` plus `scripts/verify_app.sh`. Version 1.3.2 (code `a628a8c`) passed 199 tests and signed universal bundle verification on 2026-09-05. The installed `/Applications/Codex Watch.app` remains 1.3.2 build 22 and was rechecked on 2026-09-09. Broader strict-concurrency and sanitizer checks passed for the preceding 1.3.1 runtime fixes; they were not repeated for display preferences or documentation.
+- Native Computer Use timed out during the implementation. Spark-toggle appearance, notification delivery, Launch at Login, reset confirmation, dashboard geometry, CSV save, and Gatekeeper acceptance have no recorded visual confirmation. Do not substitute protocol tests for those checks.
+- Start with `docs/agent-harness.md` for proportional verification; `ARCHITECTURE.md` owns structure. Active contracts own behavior, and `docs/decisions/README.md` routes to the relevant rationale. Do not reread every decision or rerun all gates for each task.
 
-- Repository: `https://github.com/moebis/codex-watch`
-- Upstream attribution: `https://github.com/smallyunet/codex-notch`
-- Local checkout: `/Users/moebis/Documents/Codex/Codex Watch`
-- Integration policy: work directly on `main`; do not create branches unless the user explicitly reverses that policy.
-- Version 1.3.2 build 22 is implemented in commit `a628a8c`. On 2026-09-05 it passed contracts, 199 tests, and signed universal `arm64` and `x86_64` bundle verification. It was installed at `/Applications/Codex Watch.app`, relaunched, and confirmed running with its app-server child. The installed executable matched the verified build. Spark rows now default to hidden, including the versioned GPT names; the menu visibility toggle persists both choices. Recheck live machine state before relying on installation details. The underlying 1.3.1 audit fixes previously passed release-script regressions, strict concurrency, AddressSanitizer, and ThreadSanitizer; those broader checks were not repeated for this settings-only change.
-- Stable protocol schema inspection confirmed all four required account methods, including reset consumption, without experimental opt-in. Live reads through the production Swift account service validated base-weekly quota and Lifetime data; no reset was consumed.
-- The previous installed 1.3.1 build 21 bundle was preserved recoverably. No version tag or GitHub Release was created; only local installation and main publication were authorized. The Computer Use bridge timed out, so real-menu Spark-toggle appearance, notification, Launch at Login, reset confirmation, dashboard geometry, CSV save, and first-launch Gatekeeper acceptance remain owner-operated.
+## Durable lessons from this thread
 
-## Durable product decisions
+- **Pipe behavior needs a real child-process test.** POSIX reads consume short JSONL replies while stdout stays open. Foundation convenience reads may wait for a full buffer or EOF; in-memory transports missed that failure.
+- **Capability and generation ownership matter.** Prefer managed app-server quota, with independent HTTPS fallback and richer analytics. Publish quota before slow analytics; authentication loss makes retained analytics stale even after quota-only refreshes. Share connection startup, revalidate accounts, and recover with the bounded retry cadence.
+- **Spark is a display preference.** `showCodexSparkStats` defaults false; toggling rebuilds the menu without fetching. Match adjacent Codex/Spark words in IDs or titles, including versioned GPT names and duplicate suffixes, while preserving `Codex Sparkle`. Base-weekly quota never changes source because of this toggle. Native row labels append `remaining`.
+- **Preserve quota and reset meaning.** Prefer the explicit base `codex` bucket, validate numeric strings in full, and retain notification threshold history through same-window corrections. Never infer lifetime totals from a bounded year or retry uncertain reset spending automatically.
+- **Keep builds out of File Provider.** Synced paths can reattach Finder metadata and invalidate strict signatures. Use nonsynced scratch/output paths and inspect the exact installed or extracted bundle. App bundles do not back up user preferences or chosen CSV exports.
 
-1. **Codex-only native scope.** Keep the focused AppKit and SwiftUI architecture. Do not import CodexBar's multi-provider, browser-cookie, updater, or dependency surface.
-2. **Stable quota meaning.** The menu-bar percentage is the remaining base-weekly quota. Other windows may appear in the menu, but they never replace that number.
-3. **Separate truthful sources.** Current quota comes from `/usage`; bounded range analytics comes from one trailing-365-day request; exact lifetime metrics come from `/profiles/me`. Never reconstruct lifetime totals from incomplete daily history or a manual baseline.
-4. **Narrow privacy boundary.** Read only the existing bounded Codex auth file, contact only the original ChatGPT HTTPS host, retain authenticated data in memory, and export only a user-selected validated Usage projection.
-5. **Independent capability failures.** Quota, Usage, Lifetime, and reset-credit detail may fail independently. Preserve last-good in-memory capability data only with explicit stale presentation.
-6. **Native adaptive status presentation.** Use a template SF Symbol and native text color. Custom colored menu-bar artwork and forced foreground colors failed across macOS appearances.
-7. **Spark visibility is an explicit preference.** Decode Spark windows and hide them by default. `Show Codex Spark Stats` persists the chosen visibility and rebuilds the menu without fetching. Match adjacent Codex/Spark words in IDs or titles, including versioned GPT names and duplicate suffixes, without changing the base quota.
-8. **No automatic updater.** Local builds and tag-driven GitHub releases are deliberate. Do not reintroduce update checks, downloads, or installs without an explicit security and product decision.
-9. **Official account source with compatibility fallback.** Prefer the local Codex app-server for managed-auth quota, account usage, update notifications, and confirmed reset credits. Retain bounded same-host HTTPS only as the experimental-command fallback and richer aggregate analytics source.
-10. **Explicit user controls only.** Notifications default off and contain no private values. Reset credits require confirmation and idempotent retry. Launch at Login and Copy Diagnostics are direct user actions; diagnostics contain operational state only.
+## Retention and efficient maintenance
 
-## Lessons from the 1.2.2 engineering audit
+Keep the installed app plus one latest verified rollback bundle in `~/Library/Application Support/Codex Watch/Backups`. On 2026-09-09 cleanup retained the 1.3.1 rollback and removed older backups and obsolete project build/temp artifacts. Inspect live inventory before future deletion; do not generalize this rule to unrelated projects, shared caches, Time Machine, credentials, or user exports.
 
-- A metadata size check followed by `Data(contentsOf:)` is not a durable bound. Enforce limits while reading the opened file or response stream.
-- Local file I/O must not run on the main actor. The credential read now uses a sendable abstraction and a utility-priority detached task with a hard one-mebibyte ceiling.
-- Retained values after authentication failure are stale even when the last successful network request did not fail directly. Staleness describes current trust, not only the last capability call.
-- Server-generated duplicate identifiers can gain numeric suffixes. Presentation filters must model the identifier family, not a short exact-value list.
-- Actor and sendability annotations should describe actual ownership before adopting Swift 6 language mode. The source passes complete strict-concurrency diagnostics with warnings treated as errors while remaining in Swift 5 mode.
-- The refresh coordinator's generation model is simpler and safer than independent repeating timers: automatic work coalesces, manual work replaces, and stale generations cannot publish.
-- Leak-tool output from Apple frameworks is not evidence of a project leak. Prefer project-owned stack evidence, AddressSanitizer, ThreadSanitizer, stable runtime sampling, and bounded lifecycle review; never claim absolute leak freedom.
-
-## Current-release safeguards
-
-- The Codex app-server uses JSONL over stdio and the required initialize handshake with experimental APIs disabled. Bound each line while reading, discard child stderr, validate request IDs and documented response variants, and ignore private thread-level account usage.
-- The app-server command is currently experimental. Keep quota fallback independent from compatibility-only Usage analytics so keyring-authenticated users retain official account surfaces and file-authenticated users retain richer views.
-- Use POSIX reads for pipe input: Foundation's convenience read can wait to fill a buffer and time out a short initialize reply. Test real child-process output, not only an in-memory transport.
-- Share connection startup, revalidate accounts, clean up failed transports, and recover after a 30-second retry floor. Unsupported optional methods preserve healthy quota connections; uncertain reset requests retain the caller's idempotency key and never retry automatically.
-- Select the explicit base Codex bucket, validate numeric text in full, retain notification history across same-window corrections, and publish quota before slower analytics through the generation guard. Sign-in failure marks retained analytics stale even after quota-only refreshes.
-- A rate-limit update is a quota-only refresh trigger. It coalesces with active work and never forces the bounded analytics request.
-- Release packaging first runs `check_release.sh` for contracts, script regressions, and strict concurrency. Build scripts keep Swift intermediates in temporary storage by default. Release verification must inspect the executable metadata before the one real build, extract the archive into a unique temporary directory, and verify the exact extracted app rather than a sibling or stale bundle.
-
-## Security posture recorded on 2026-08-23
-
-- A complete repository security review and a separate final working-tree diff review found no reportable vulnerabilities.
-- Verified controls include one-mebibyte local and remote read limits, same-host and effective-port HTTPS enforcement, redirect rejection, ephemeral no-cookie networking, response validation, formula-safe CSV, hardened runtime signing, no dependencies, no updater, and no sensitive logging.
-- The reviews used the documented parent fallback because delegated security workers were unavailable. TAC advisory enrichment was also unavailable. Future high-assurance reviews may repeat with independent workers and TAC access.
-- Remaining hardening decision: App Sandbox. The current app has no entitlements and must read `~/.codex/auth.json`; sandboxing requires a deliberate credential-access design.
-- Distribution remains ad-hoc signed and unnotarized until Developer ID credentials and a release policy are supplied.
-
-## Verification and release routine
-
-1. Read `AGENTS.md`, `ARCHITECTURE.md`, this file, active contracts, and relevant active decisions.
-2. State the observable change, preserved behavior, exclusions, risk, and verification plan.
-3. Add an outcome-oriented regression test for behavior changes.
-4. Run `./scripts/check_contracts.sh`, `swift test`, and `./scripts/verify.sh /private/tmp/codex-watch-verify`.
-5. For concurrency, authentication, parsing, or lifecycle changes, also run complete strict-concurrency compilation and the relevant sanitizer suites.
-6. For distributable builds, run a universal `./scripts/release.sh`, preserve the previous installed bundle recoverably, verify the installed bundle, then relaunch and confirm the process remains alive.
-7. Commit and push directly to `main` only when explicitly authorized. Create tags or GitHub Releases only when separately requested.
-
-Build and sign outside File Provider or other synced repository paths. Those services can reattach Finder metadata to a bundle and invalidate strict signature verification; this is an output-location issue, not a reason to weaken verification.
-
-## Documentation hygiene
-
-- Current authority is limited to `README.md`, `AGENTS.md`, `ARCHITECTURE.md`, this file, active behavior contracts, active decisions, source, tests, and scripts.
-- Completed release plans, superseded design specifications, and superseded decision files were removed after their durable constraints were consolidated. Git history remains the historical record.
-- Do not store tokens, credentials, raw responses, member data, temporary paths, process IDs, or local rollback locations in repository memory.
+No source or test behavior changed in that maintenance pass. The regressions remain useful; duplicated documentation and repeated verification instructions were the overhead. Inspect workflow triggers before every push and skip hosted CI when direct checks suffice. No version tag or GitHub Release was requested.
